@@ -7,6 +7,7 @@ import SentimentCard from '../components/SentimentCard';
 import { motion } from 'framer-motion';
 
 import DashboardSkeleton from '../components/DashboardSkeleton';
+import SignalGauge from '../components/SignalGauge';
 
 function Dashboard() {
     const [predictionData, setPredictionData] = useState(null);
@@ -119,6 +120,7 @@ function Dashboard() {
 
                             {predictionData && !loading && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                                    <SignalGauge signal={predictionData.signal} score={predictionData.signal_score} />
                                     <PredictionCard data={predictionData} />
                                     <SentimentCard sentiment={sentimentData} />
                                     <PriceChart data={predictionData.chart_data} />
@@ -136,6 +138,7 @@ function Dashboard() {
 
                             {predictionData2 && !loading2 && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                                    <SignalGauge signal={predictionData2.signal} score={predictionData2.signal_score} />
                                     <PredictionCard data={predictionData2} />
                                     <SentimentCard sentiment={sentimentData2} />
                                     <PriceChart data={predictionData2.chart_data} />
@@ -145,7 +148,7 @@ function Dashboard() {
                     </div>
                 ) : (
                     /* ================= SINGLE MODE LAYOUT ================= */
-                    <div className="flex flex-col gap-8 max-w-4xl mx-auto min-h-[600px]">
+                    <div className="flex flex-col gap-8 max-w-6xl mx-auto min-h-[600px]">
 
                         {/* Standard Header */}
                         <div className="relative z-50">
@@ -157,7 +160,8 @@ function Dashboard() {
 
                         {predictionData && !loading && (
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <SignalGauge signal={predictionData.signal} score={predictionData.signal_score} />
                                     <PredictionCard data={predictionData} />
                                     <SentimentCard sentiment={sentimentData} />
                                 </div>

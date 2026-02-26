@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from stocks import get_all_stocks
-from model import train_predict, fetch_data
+from model import train_predict, fetch_data, run_backtest, get_market_heatmap
 from sentiment import get_stock_sentiment
 
 app = FastAPI()
@@ -51,3 +51,16 @@ def get_history(symbol: str, period: str = "1mo"):
 def get_sentiment(symbol: str):
     return get_stock_sentiment(symbol)
 
+@app.get("/api/backtest/{symbol}")
+def backtest(symbol: str, days: int = 30):
+    result = run_backtest(symbol, days=days)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.get("/api/heatmap")
+def heatmap():
+    """
+    Returns the daily % change for NIFTY 50 stocks for heatmap visualization.
+    """
+    return get_market_heatmap()

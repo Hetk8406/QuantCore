@@ -166,6 +166,59 @@ def calculate_macd(data, slow=26, fast=12, signal=9):
     signal_line = macd.ewm(span=signal, adjust=False).mean()
     return macd, signal_line
 
+def get_signal(current_price, predicted_price, rsi, macd, macd_signal):
+    """
+    Generates a Buy/Sell signal based on technicals and prediction.
+    Score: 0 (Strong Sell) to 100 (Strong Buy).
+    """
+    score = 50  # Neutral start
+    
+    # 1. Price Prediction Impact (Weight: 40%)
+    # If predicted price is higher -> Bullish
+    price_change = ((predicted_price - current_price) / current_price) * 100
+    if price_change > 1:
+        score += 20
+    elif price_change < -1:
+        score -= 20
+        
+    # 2. RSI Impact (Weight: 30%)
+    # RSI < 30 (Oversold) -> Buy Signal
+    # RSI > 70 (Overbought) -> Sell Signal
+    if rsi is not None:
+        if rsi < 30:
+            score += 15
+        elif rsi > 70:
+            score -= 15
+        elif rsi > 50:
+             score += 5
+        else:
+             score -= 5
+
+    # 3. MACD Impact (Weight: 30%)
+    # MACD > Signal -> Bullish
+    if macd is not None and macd_signal is not None:
+        if macd > macd_signal:
+            score += 15
+        else:
+            score -= 15
+            
+    # Clamp Score
+    score = max(0, min(100, score))
+    
+    # Determine Verdict
+    if score >= 80:
+        verdict = "STRONG BUY"
+    elif score >= 60:
+        verdict = "BUY"
+    elif score <= 20:
+        verdict = "STRONG SELL"
+    elif score <= 40:
+        verdict = "SELL"
+    else:
+        verdict = "NEUTRAL"
+        
+    return verdict, score
+
 def train_predict(symbol: str, model_type="linear"):
     """
     Dispatcher for model training and prediction.
@@ -199,8 +252,29 @@ def train_predict(symbol: str, model_type="linear"):
     df['MA10'] = df['Close'].rolling(window=10).mean()
     df['MA50'] = df['Close'].rolling(window=50).mean()
     df['RSI'] = calculate_rsi(df['Close'])
-    df['MACD'], df['Signal'] = calculate_macd(df['Close'])
+    macd_series, signal_series = calculate_macd(df['Close'])
+    df['MACD'] = macd_series
+    df['Signal'] = signal_series
     
+    # Extract Latest Technicals for Signal
+    latest_rsi = df.iloc[-1]['RSI']
+    latest_macd = df.iloc[-1]['MACD']
+    latest_signal_line = df.iloc[-1]['Signal']
+    
+    # Calculate Signal
+    # Handle NaN values safely
+    latest_rsi_val = float(latest_rsi) if pd.notnull(latest_rsi) else None
+    latest_macd_val = float(latest_macd) if pd.notnull(latest_macd) else None
+    latest_sig_val = float(latest_signal_line) if pd.notnull(latest_signal_line) else None
+    
+    signal_verdict, signal_score = get_signal(
+        current_price=df.iloc[-1]['Close'], 
+        predicted_price=next_price, 
+        rsi=latest_rsi_val, 
+        macd=latest_macd_val, 
+        macd_signal=latest_sig_val
+    )
+
     # Replace NaN with None for JSON serialization
     # Note: Pandas where(pd.notnull(df), None) can sometimes be tricky with types. 
     # Better to convert to dict first then clean it.
@@ -231,5 +305,162 @@ def train_predict(symbol: str, model_type="linear"):
         "mae": round(float(mae), 2),
         "r2_score": round(float(r2), 4),
         "chart_data": clean_chart_data,
-        "model_type": model_type.upper()
+        "model_type": model_type.upper(),
+        "signal": signal_verdict,
+        "signal_score": signal_score,
+        "technicals": {
+            "rsi": round(latest_rsi_val, 2) if latest_rsi_val else None,
+            "macd": round(latest_macd_val, 2) if latest_macd_val else None
+        }
     }
+
+def run_backtest(symbol, days=30):
+    """
+    Simulates model performance over the last N days.
+    """
+    df = fetch_data(symbol, period="1y") # Need enough history
+    if df is None:
+        return {"error": "Could not fetch data"}
+        
+    if len(df) < days + 60: # Ensure enough training data
+        return {"error": "Not enough historical data for backtest"}
+
+    # Prepare Data
+    df['MA10'] = df['Close'].rolling(window=10).mean()
+    df['MA50'] = df['Close'].rolling(window=50).mean()
+    df = df.dropna()
+    
+    # Reset index to make slicing easier
+    df = df.reset_index()
+    
+    # We want to simulate predictions for the LAST 'days' rows
+    # So we train on everything BEFORE that
+    
+    results = []
+    
+    # Iterate through the backtest period
+    # For each day in the last N days, train on data up to that day - 1
+    
+    # Optimization: Retraining every single day is slow.
+    # Approach: Train ONCE on data up to (Today - Days) and predict forward? 
+    # No, that's multi-step forecasting which drifts.
+    # Approach 2: Rolling Window (Standard Backtest).
+    # Since we use Linear Regression which is fast, we CAN retrain or just use one model trained on past data.
+    
+    # Let's use a single model trained on data prior to the test set for speed/simplicity first.
+    # Train set: Index 0 to (Total - Days)
+    # Test set: Index (Total - Days) to End
+    
+    split_idx = len(df) - days
+    train_df = df.iloc[:split_idx].copy()
+    test_df = df.iloc[split_idx:].copy()
+    
+    # Features
+    features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50']
+    target = 'Target'
+    train_df['Target'] = train_df['Close'].shift(-1)
+    train_df = train_df.dropna()
+    
+    X_train = train_df[features]
+    y_train = train_df['Target']
+    
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    
+    # Predict on Test Set
+    # We predict the 'Next Day Close' for each day in test set
+    X_test = test_df[features]
+    predictions = model.predict(X_test)
+    
+    # Calculate Accuracy
+    dates = test_df['Date'].dt.strftime('%Y-%m-%d').tolist()
+    actuals = test_df['Close'].tolist() # Wait, we predict next day, so align with next day actuals?
+    # Correct: On Day T, we predict Close(T+1).
+    # So Prediction[i] should be compared with Actual[i+1]
+    
+    # Let's simplify: 
+    # Logic: On Date X, Model predicts Price Y.
+    # We want to show: Date X, Actual Price (Close), Predicted Price (Validation)
+    
+    # Re-align for display:
+    # We have X_test rows. 
+    # For row i (Date D), we predict Target (Date D+1 Close).
+    
+    aligned_results = []
+    total_error = 0
+    count = 0
+    
+    # Getting actual next day closes from the original full dataframe
+    # The 'test_df' has rows for dates D...
+    # We need Close for D+1...
+    
+    future_closes = df['Close'].shift(-1).iloc[split_idx:]
+    # Last row of future_closes will be NaN (tomorrow)
+    
+    preds_list = predictions.tolist()
+    actuals_list = future_closes.tolist()
+    
+    for i in range(len(dates)):
+        if i >= len(actuals_list) or pd.isna(actuals_list[i]):
+            continue
+            
+        pred = preds_list[i]
+        act = actuals_list[i]
+        
+        diff = abs(pred - act)
+        error_pct = (diff / act) * 100
+        total_error += error_pct
+        count += 1
+        
+        aligned_results.append({
+            "date": dates[i],
+            "actual": round(act, 2),
+            "predicted": round(pred, 2),
+            "error_pct": round(error_pct, 2)
+        })
+        
+    accuracy = 100 - (total_error / count) if count > 0 else 0
+    
+    return {
+        "symbol": symbol,
+        "days": days,
+        "accuracy": round(accuracy, 2),
+        "data": aligned_results
+    }
+
+def get_market_heatmap():
+    from stocks import NIFTY_50
+    import yfinance as yf
+    
+    # Download last 5 days to ensure we get at least 2 valid trading days
+    tickers_str = " ".join(NIFTY_50)
+    
+    # Suppress output and download
+    df = yf.download(tickers_str, period="5d", progress=False)
+    
+    if "Close" not in df:
+        return []
+        
+    close_data = df['Close']
+    results = []
+    
+    for symbol in NIFTY_50:
+        try:
+            if symbol in close_data:
+                stock_close = close_data[symbol].dropna()
+                if len(stock_close) >= 2:
+                    prev = float(stock_close.iloc[-2])
+                    curr = float(stock_close.iloc[-1])
+                    pct = ((curr - prev) / prev) * 100
+                    results.append({
+                        "symbol": symbol,
+                        "name": symbol.replace(".NS", ""),
+                        "price": round(curr, 2),
+                        "change": round(pct, 2)
+                    })
+        except Exception:
+            pass
+            
+    # Sort by descending order of percentage change
+    results.sort(key=lambda x: x["change"], reverse=True)
+    return results

@@ -1,5 +1,5 @@
-import React from 'react';
-import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Area, ResponsiveContainer } from 'recharts';
+import React, { useState } from 'react';
+import { ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Area, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -30,6 +30,9 @@ class ErrorBoundary extends React.Component {
 }
 
 const PriceChart = ({ data }) => {
+    const [showMA10, setShowMA10] = useState(true);
+    const [showMA50, setShowMA50] = useState(true);
+
     // 1. Safety Check: Ensure data exists and is an array
     if (!data || !Array.isArray(data) || data.length === 0) {
         return null;
@@ -45,124 +48,141 @@ const PriceChart = ({ data }) => {
         <div className="w-full space-y-6 mt-6">
 
             {/* Price + MA Chart */}
-            <div className="bg-card/50 rounded-xl p-4 border border-border overflow-hidden" style={{ height: '480px' }}>
-                <div className="relative w-full h-full">
-                    {/* Header with Custom Legend */}
-                    <div className="flex flex-wrap items-center justify-between mb-4 z-10 relative">
-                        <h3 className="text-lg font-semibold text-foreground/80">Price History & Moving Averages</h3>
+            <div className="bg-card/50 rounded-xl p-4 border border-border" style={{ height: '500px' }}>
+                <div className="flex flex-col h-full">
+                    {/* Header with Custom Legend & Toggles */}
+                    <div className="flex flex-wrap items-center justify-between mb-4 z-10">
+                        <h3 className="text-lg font-semibold text-foreground/80">Price Action</h3>
                         <div className="flex items-center gap-4 text-xs font-semibold">
-                            <div className="flex items-center gap-2 text-blue-500">
-                                <div className="w-4 h-1 rounded-full bg-blue-500"></div>
+                            <div className="flex items-center gap-2 text-blue-400">
+                                <div className="w-3 h-1 bg-blue-400"></div>
                                 <span>Close Price</span>
                             </div>
-                            <div className="flex items-center gap-2 text-emerald-500">
-                                <div className="w-4 h-1 rounded-full bg-emerald-500"></div>
-                                <span>10-Day MA</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-amber-500">
-                                <div className="w-4 h-1 rounded-full bg-amber-500"></div>
-                                <span>50-Day MA</span>
-                            </div>
+
+                            {/* Toggle MA10 */}
+                            <button
+                                onClick={() => setShowMA10(!showMA10)}
+                                className={`flex items-center gap-2 transition-opacity ${showMA10 ? 'opacity-100' : 'opacity-40 line-through'}`}
+                            >
+                                <div className="w-3 h-1 bg-emerald-400"></div>
+                                <span className="text-emerald-400">10-Day MA</span>
+                            </button>
+
+                            {/* Toggle MA50 */}
+                            <button
+                                onClick={() => setShowMA50(!showMA50)}
+                                className={`flex items-center gap-2 transition-opacity ${showMA50 ? 'opacity-100' : 'opacity-40 line-through'}`}
+                            >
+                                <div className="w-3 h-1 bg-amber-400"></div>
+                                <span className="text-amber-400">50-Day MA</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div className="w-full overflow-x-auto pb-4">
-                        <div style={{ minWidth: '800px', height: '400px' }}>
-                            <ComposedChart width={800} height={400} data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorClose" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                <XAxis
-                                    dataKey="Date"
-                                    stroke="#94a3b8"
-                                    fontSize={10}
-                                    tickFormatter={(str) => (str && typeof str === 'string') ? str.slice(5) : ''}
+                    <div className="w-full mt-4 h-[400px] overflow-x-auto overflow-y-hidden">
+                        <ComposedChart width={800} height={400} data={data} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} opacity={0.4} />
+                            <XAxis
+                                dataKey="Date"
+                                stroke="#cbd5e1"
+                                fontSize={12}
+                                tickFormatter={(str) => (str && typeof str === 'string') ? str.slice(5) : ''}
+                                tick={{ fill: '#94a3b8' }}
+                                tickMargin={10}
+                            />
+                            <YAxis
+                                domain={['auto', 'auto']}
+                                stroke="#cbd5e1"
+                                fontSize={12}
+                                tickFormatter={(val) => `₹${val}`}
+                                tick={{ fill: '#94a3b8' }}
+                                width={60}
+                            />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px' }}
+                                itemStyle={{ fontSize: '12px' }}
+                                labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
+                            />
+
+                            <Line
+                                type="monotone"
+                                dataKey="Close"
+                                stroke="#3b82f6"
+                                strokeWidth={3}
+                                dot={false}
+                                connectNulls
+                                name="Close Price"
+                            />
+
+                            {showMA10 && (
+                                <Line
+                                    type="monotone"
+                                    dataKey="MA10"
+                                    stroke="#10b981"
+                                    strokeWidth={2}
+                                    dot={false}
+                                    connectNulls
+                                    name="10-Day MA"
                                 />
-                                <YAxis
-                                    domain={['auto', 'auto']}
-                                    stroke="#94a3b8"
-                                    fontSize={12}
-                                    tickFormatter={(val) => `₹${val}`}
+                            )}
+
+                            {showMA50 && (
+                                <Line
+                                    type="monotone"
+                                    dataKey="MA50"
+                                    stroke="#f59e0b"
+                                    strokeWidth={2}
+                                    dot={false}
+                                    connectNulls
+                                    name="50-Day MA"
                                 />
-                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }} />
-                                {/* Legends Removed from here */}
-                                <Area type="monotone" dataKey="Close" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorClose)" connectNulls />
-                                <Line type="monotone" dataKey="MA10" stroke="#10b981" strokeWidth={2} dot={false} connectNulls />
-                                <Line type="monotone" dataKey="MA50" stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls />
-                            </ComposedChart>
-                        </div>
+                            )}
+                        </ComposedChart>
                     </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* RSI Chart */}
-                <div className="bg-card/50 rounded-xl p-4 border border-border">
-                    <div className="flex flex-wrap items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold text-foreground/80">RSI (Relative Strength Index)</h3>
-                        <div className="flex items-center gap-4 text-xs font-semibold">
-                            <div className="flex items-center gap-2 text-violet-500">
-                                <div className="w-4 h-1 rounded-full bg-violet-500"></div>
-                                <span>RSI</span>
-                            </div>
-                        </div>
+                <div className="bg-card/50 rounded-xl p-4 border border-border block">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-foreground/80">RSI Strength</h3>
+                        <span className="text-xs font-bold text-violet-400">RSI</span>
                     </div>
 
-                    <div className="w-full overflow-x-auto pb-2">
-                        <div style={{ minWidth: '400px', height: '250px' }}>
-                            <ComposedChart width={400} height={250} data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                <XAxis
-                                    dataKey="Date"
-                                    stroke="#94a3b8"
-                                    fontSize={10}
-                                    tickFormatter={(str) => (str && typeof str === 'string') ? str.slice(5) : ''}
-                                />
-                                <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={10} ticks={[30, 70]} />
-                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }} />
-                                <Line type="monotone" dataKey="RSI" stroke="#8b5cf6" strokeWidth={2} dot={false} connectNulls />
-                            </ComposedChart>
-                        </div>
+                    <div className="w-full h-[200px] overflow-x-auto overflow-y-hidden">
+                        <ComposedChart width={400} height={200} data={data} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} opacity={0.3} />
+                            <XAxis dataKey="Date" hide />
+                            <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} ticks={[30, 70]} />
+                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                            {/* Reference Lines for Overbought/Oversold */}
+                            <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.5} />
+                            <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" strokeOpacity={0.5} />
+                            <Line type="monotone" dataKey="RSI" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                        </ComposedChart>
                     </div>
                 </div>
 
                 {/* MACD Chart */}
-                <div className="bg-card/50 rounded-xl p-4 border border-border">
-                    <div className="flex flex-wrap items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold text-foreground/80">MACD (Convergence Divergence)</h3>
-                        <div className="flex items-center gap-4 text-xs font-semibold">
-                            <div className="flex items-center gap-2 text-pink-500">
-                                <div className="w-3 h-3 rounded-sm bg-pink-500/60 border border-pink-500"></div>
-                                <span>MACD</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-rose-500">
-                                <div className="w-4 h-1 rounded-full bg-rose-500"></div>
-                                <span>Signal</span>
-                            </div>
+                <div className="bg-card/50 rounded-xl p-4 border border-border block">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-foreground/80">MACD Momentum</h3>
+                        <div className="flex gap-2 text-xs">
+                            <span className="text-pink-500">MACD</span>
+                            <span className="text-rose-500">Signal</span>
                         </div>
                     </div>
 
-                    <div className="w-full overflow-x-auto pb-2">
-                        <div style={{ minWidth: '400px', height: '250px' }}>
-                            <ComposedChart width={400} height={250} data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                <XAxis
-                                    dataKey="Date"
-                                    stroke="#94a3b8"
-                                    fontSize={10}
-                                    tickFormatter={(str) => (str && typeof str === 'string') ? str.slice(5) : ''}
-                                />
-                                <YAxis stroke="#94a3b8" fontSize={10} />
-                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }} />
-                                {/* Replaced Bar with Area to fix 'minPointSize' crash */}
-                                <Area type="monotone" dataKey="MACD" fill="#ec4899" stroke="#ec4899" fillOpacity={0.6} connectNulls />
-                                <Line type="monotone" dataKey="Signal" stroke="#f43f5e" strokeWidth={2} dot={false} connectNulls />
-                            </ComposedChart>
-                        </div>
+                    <div className="w-full h-[200px] overflow-x-auto overflow-y-hidden">
+                        <ComposedChart width={400} height={200} data={data} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} opacity={0.3} />
+                            <XAxis dataKey="Date" hide />
+                            <YAxis stroke="#64748b" fontSize={10} />
+                            <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                            <Line type="monotone" dataKey="MACD" stroke="#ec4899" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="Signal" stroke="#f43f5e" strokeWidth={1.5} dot={false} />
+                        </ComposedChart>
                     </div>
                 </div>
             </div>

@@ -9,6 +9,8 @@ import { AnimatePresence } from 'framer-motion';
 import Footer from './components/Footer';
 
 import NewsPage from './pages/NewsPage';
+import BacktestPage from './pages/BacktestPage';
+import HeatmapPage from './pages/HeatmapPage';
 
 function AppContent() {
   const location = useLocation();
@@ -22,6 +24,8 @@ function AppContent() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/news" element={<NewsPage />} />
+            <Route path="/backtest" element={<BacktestPage />} />
+            <Route path="/heatmap" element={<HeatmapPage />} />
             <Route path="/features" element={<FeaturesPage />} />
             <Route path="/about" element={<AboutPage />} />
           </Routes>
