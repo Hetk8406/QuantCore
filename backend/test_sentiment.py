@@ -1,11 +1,17 @@
-from sentiment import get_stock_sentiment
-import time
+import yfinance as yf
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-print("Starting sentiment test...")
-start = time.time()
-try:
-    result = get_stock_sentiment("RELIANCE.NS")
-    print("Sentiment Result:", result)
-except Exception as e:
-    print("Error:", e)
-print(f"Finished in {time.time() - start:.2f} seconds")
+analyzer = SentimentIntensityAnalyzer()
+
+def test_query(query):
+    print(f"Testing Query: '{query}'...")
+    search = yf.Search(query)
+    news = search.news
+    print(f"Found {len(news)} articles.")
+    for article in news[:3]:
+        print(f" - {article.get('title')}")
+
+if __name__ == "__main__":
+    test_query("Reliance Industries Stock News")
+    test_query("TCS Stock News")
+    test_query("HDFCBANK.NS")

@@ -2,6 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
@@ -9,6 +10,51 @@ from datetime import datetime, timedelta
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
+
+CURRENCY_SYMBOLS = {
+    'USD': '$',
+    'INR': '₹',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'CNY': '¥',
+    'CAD': '$',
+    'AUD': '$',
+    'KRW': '₩',
+    'HKD': 'HK$',
+    'SGD': 'S$',
+    'CHF': 'CHF',
+    'AUD': 'A$',
+    'NZD': 'NZ$',
+    'TWD': 'NT$',
+    'BRL': 'R$',
+    'RUB': '₽',
+    'ZAR': 'R',
+    'THB': '฿',
+    'IDR': 'Rp',
+    'TRY': '₺',
+    'SAR': 'SR',
+    'AED': 'DH',
+    'BSE': '₹',
+    'NSE': '₹'
+}
+
+def get_currency_meta(symbol: str):
+    """Detects currency for a ticker using fast_info."""
+    try:
+        ticker = yf.Ticker(symbol)
+        code = ticker.fast_info.get('currency', 'INR')
+        
+        # Fallback to the code itself if we don't have a specific symbol
+        # This prevents Samsung (KRW) from ever defaulting to INR (₹)
+        symbol_out = CURRENCY_SYMBOLS.get(code, code)
+        
+        return {
+            "code": code,
+            "symbol": symbol_out
+        }
+    except Exception:
+        return {"code": "INR", "symbol": "₹"}
 
 def fetch_data(symbol: str, period="5y"):
     """Fetches historical data from Yahoo Finance."""
@@ -296,6 +342,9 @@ def train_predict(symbol: str, model_type="linear"):
                 clean_record[k] = v
         clean_chart_data.append(clean_record)
 
+    # Currency Meta
+    meta = get_currency_meta(symbol)
+    
     return {
         "symbol": symbol,
         "current_price": round(df.iloc[-1]['Close'], 2),
@@ -308,6 +357,8 @@ def train_predict(symbol: str, model_type="linear"):
         "model_type": model_type.upper(),
         "signal": signal_verdict,
         "signal_score": signal_score,
+        "currency_code": meta["code"],
+        "currency_symbol": meta["symbol"],
         "technicals": {
             "rsi": round(latest_rsi_val, 2) if latest_rsi_val else None,
             "macd": round(latest_macd_val, 2) if latest_macd_val else None
@@ -326,45 +377,41 @@ def run_backtest(symbol, days=30):
         return {"error": "Not enough historical data for backtest"}
 
     # Prepare Data
+    
+def run_backtest(symbol, days=30, model_type="linear"):
+    """
+    Simulates model performance over the last N days.
+    """
+    df = fetch_data(symbol, period="1y") # Needs 1 year to have enough training data
+    if df is None or len(df) < days + 50:
+        return {"error": "Insufficient data for a backtest. (Need more than 50 days total)"}
+    
+    # Technical Indicators
     df['MA10'] = df['Close'].rolling(window=10).mean()
     df['MA50'] = df['Close'].rolling(window=50).mean()
     df = df.dropna()
-    
-    # Reset index to make slicing easier
     df = df.reset_index()
     
-    # We want to simulate predictions for the LAST 'days' rows
-    # So we train on everything BEFORE that
-    
-    results = []
-    
-    # Iterate through the backtest period
-    # For each day in the last N days, train on data up to that day - 1
-    
-    # Optimization: Retraining every single day is slow.
-    # Approach: Train ONCE on data up to (Today - Days) and predict forward? 
-    # No, that's multi-step forecasting which drifts.
-    # Approach 2: Rolling Window (Standard Backtest).
-    # Since we use Linear Regression which is fast, we CAN retrain or just use one model trained on past data.
-    
-    # Let's use a single model trained on data prior to the test set for speed/simplicity first.
-    # Train set: Index 0 to (Total - Days)
-    # Test set: Index (Total - Days) to End
-    
+    # Split
     split_idx = len(df) - days
     train_df = df.iloc[:split_idx].copy()
     test_df = df.iloc[split_idx:].copy()
     
     # Features
     features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50']
-    target = 'Target'
     train_df['Target'] = train_df['Close'].shift(-1)
     train_df = train_df.dropna()
     
     X_train = train_df[features]
     y_train = train_df['Target']
     
-    model = LinearRegression()
+    # Choose Model
+    if model_type == 'lstm':
+        # Use Random Forest as 'Advanced' for the interactive backtester
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+    else:
+        model = LinearRegression()
+        
     model.fit(X_train, y_train)
     
     # Predict on Test Set
@@ -502,7 +549,7 @@ def get_market_heatmap():
     results.sort(key=lambda x: x["change"], reverse=True)
     return results
 
-def get_price_analysis_data(symbol):
+def get_price_analysis_data(symbol, model_type="linear"):
     """
     Fetches historical data and runs a mini-backtest to show predictions vs actuals 
     for the analysis period.
@@ -523,19 +570,24 @@ def get_price_analysis_data(symbol):
     train_df = df.iloc[:split_idx].copy()
     test_df = df.iloc[split_idx:].copy()
     
-    # Train a standard linear model on everything BEFORE the analysis period
+    # Train a model on everything BEFORE the analysis period
     features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50']
     train_df['Target'] = train_df['Close'].shift(-1)
     train_df = train_df.dropna()
     
     X_train = train_df[features]
     y_train = train_df['Target']
-    model = LinearRegression()
+    
+    if model_type == 'lstm':
+        # For analysis, we use RandomForest as 'Advanced' because it's faster than LSTM 
+        # but capture more patterns than Linear
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+    else:
+        model = LinearRegression()
+        
     model.fit(X_train, y_train)
     
     # Predict for each day in the analysis period
-    # On day T, we use features from day T to predict close of day T+1
-    # So for row i, predicted = Model.predict(test_df[i])
     X_test = test_df[features]
     preds = model.predict(X_test)
     
@@ -563,11 +615,20 @@ def get_price_analysis_data(symbol):
              
         results.append({
             "date": date_str,
+            "actual_open": round(float(test_df.iloc[i]['Open']), 2),
             "actual_close": round(actual, 2),
             "predicted_close": round(predicted, 2) if predicted else None,
+            "prediction_error": round(float(actual - predicted), 2) if predicted else None,
             "accuracy": round(accuracy_val, 2) if accuracy_val else None,
             "prev_close": round(float(test_df.iloc[i-1]['Close']), 2) if i > 0 else None,
             "daily_change_pct": round(float(((test_df.iloc[i]['Close'] - test_df.iloc[i-1]['Close']) / test_df.iloc[i-1]['Close']) * 100), 2) if i > 0 else None
         })
         
-    return results
+    # Get Currency Meta
+    meta = get_currency_meta(symbol)
+        
+    return {
+        "data": results,
+        "currency_symbol": meta["symbol"],
+        "currency_code": meta["code"]
+    }

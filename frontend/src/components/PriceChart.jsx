@@ -29,7 +29,7 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-const PriceChart = ({ data }) => {
+const PriceChart = ({ data, currencySymbol = '₹' }) => {
     const [showMA10, setShowMA10] = useState(true);
     const [showMA50, setShowMA50] = useState(true);
 
@@ -94,7 +94,7 @@ const PriceChart = ({ data }) => {
                                 domain={['auto', 'auto']}
                                 stroke="#cbd5e1"
                                 fontSize={12}
-                                tickFormatter={(val) => `₹${val}`}
+                                tickFormatter={(val) => `${currencySymbol}${val}`}
                                 tick={{ fill: '#94a3b8' }}
                                 width={60}
                             />
@@ -102,6 +102,7 @@ const PriceChart = ({ data }) => {
                                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px' }}
                                 itemStyle={{ fontSize: '12px' }}
                                 labelStyle={{ color: '#94a3b8', marginBottom: '4px' }}
+                                formatter={(value) => [`${currencySymbol}${value}`, "Value"]}
                             />
 
                             <Line

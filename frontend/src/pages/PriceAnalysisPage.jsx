@@ -1,14 +1,38 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import axios from 'axios';
 import StockSelector from '../components/StockSelector';
-import { Download, FileSpreadsheet, TrendingUp, AlertCircle, Target, Briefcase, Minus, CheckCircle } from 'lucide-react';
+import { Download, TrendingUp, AlertCircle, Target, Briefcase, Minus, CheckCircle, ArrowRightLeft, ShieldCheck, Database, Cpu } from 'lucide-react';
 
 const PriceAnalysisPage = () => {
     const [selectedStock, setSelectedStock] = useState(null);
+    const [modelType, setModelType] = useState('linear');
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState(null);
+    const [resultData, setResultData] = useState(null); // The array of data
+    const [currencySymbol, setCurrencySymbol] = useState('₹');
     const [error, setError] = useState(null);
+
+    // Helper to format currency with space for long codes (e.g. KRW vs $)
+    const formatPrice = (val) => {
+        const needsSpace = currencySymbol.length > 1;
+        return `${currencySymbol}${needsSpace ? ' ' : ''}${val?.toLocaleString()}`;
+    };
+
+    // Mouse Tracking for 3D Perspective Audit
+    const mouseX = useMotionValue(0);
+    const mouseY = useMotionValue(0);
+
+    const handleMouseMove = (e) => {
+        const { clientX, clientY } = e;
+        const { innerWidth, innerHeight } = window;
+        mouseX.set((clientX / innerWidth) - 0.5);
+        mouseY.set((clientY / innerHeight) - 0.5);
+    };
+
+    const springX = useSpring(mouseX, { stiffness: 100, damping: 30 });
+    const springY = useSpring(mouseY, { stiffness: 100, damping: 30 });
+    const rotateX = useTransform(springY, [-0.5, 0.5], [5, -5]);
+    const rotateY = useTransform(springX, [-0.5, 0.5], [-5, 5]);
 
     // Watchlist state
     const [watchlist, setWatchlist] = useState(() => {
@@ -38,8 +62,10 @@ const PriceAnalysisPage = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/api/analysis/${symbol}`);
-            setResult(res.data);
+            const res = await axios.get(`http://127.0.0.1:8000/api/analysis/${symbol}?model_type=${modelType}`);
+            // res.data is now { data: [], currency_symbol: "" }
+            setResultData(res.data.data);
+            setCurrencySymbol(res.data.currency_symbol || '₹');
             setSelectedStock(symbol);
         } catch (err) {
             setError(err.response?.data?.detail || "Error loading analysis data.");
@@ -48,200 +74,231 @@ const PriceAnalysisPage = () => {
         }
     };
 
+    useEffect(() => {
+        if (selectedStock) {
+            fetchAnalysisData(selectedStock);
+        }
+    }, [modelType]);
+
     const handleDownloadCSV = () => {
-        if (!result) return;
-        
-        const headers = ["Date", "Actual Close", "AI Prediction", "Accuracy (%)", "Daily Change (%)"];
-        const rows = result.map(row => [
-            row.date,
-            row.actual_close,
-            row.predicted_close || "N/A",
-            row.accuracy || "N/A",
-            row.daily_change_pct || "0.00"
+        if (!resultData) return;
+        const headers = ["Date", "Actual Open", "Actual Close", "AI Prediction", "Pred Diff", "Daily Change (%)", "Accuracy (%)"];
+        const rows = resultData.map(row => [
+            row.date, row.actual_open, row.actual_close, row.predicted_close || "N/A",
+            row.prediction_error || "N/A", row.daily_change_pct || "0.00", row.accuracy || "N/A"
         ]);
-        
-        let csvContent = "data:text/csv;charset=utf-8," 
-            + headers.join(",") + "\n"
-            + rows.map(r => r.join(",")).join("\n");
-            
+        let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(r => r.join(",")).join("\n");
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${selectedStock}_prediction_analysis.csv`);
+        link.setAttribute("download", `${selectedStock}_audit.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground pt-32 pb-20 px-6 font-sans">
-            <div className="max-w-6xl mx-auto space-y-10">
+        <div 
+            onMouseMove={handleMouseMove}
+            className="min-h-screen bg-[#020617] text-foreground pt-36 pb-20 px-6 font-sans relative overflow-hidden"
+            style={{ perspective: "1500px" }}
+        >
+            {/* Background Data Stream Effect */}
+            <div className="absolute inset-0 pointer-events-none opacity-10">
+                <div className="absolute inset-0 bg-[linear-gradient(transparent_0%,#1e293b_50%,transparent_100%)] bg-[size:100%_20px] animate-[pulse_4s_infinite]" />
+                <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-[size:30px_30px]" />
+            </div>
 
-                {/* Header Section */}
+            <div className="max-w-7xl mx-auto space-y-12 relative z-10">
+                
+                {/* Header Segment */}
                 <div className="text-center space-y-4">
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium"
+                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.2em]"
                     >
-                        <Target className="w-4 h-4" /> Prediction Benchmarking
+                        <ShieldCheck className="w-3 h-3" /> System Audit Engine
                     </motion.div>
-                    <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                        AI Accuracy Analysis
+                    <h1 className="text-5xl md:text-7xl font-black tracking-tighter bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
+                        Price <span className="text-primary italic">Deep-Lens</span>
                     </h1>
-                    <p className="text-muted-foreground max-w-2xl mx-auto">
-                        Track how well our AI predicts stock prices day-over-day and compare results against the real market moves.
+                    <p className="text-slate-400 max-w-2xl mx-auto font-medium">
+                        Cross-referencing historical open-to-close deltas against neural predictions. 
+                        Validating model integrity for the current financial quarter.
                     </p>
                 </div>
 
-                {/* Controls Bar */}
-                <div className="bg-card/30 p-6 rounded-2xl border border-border backdrop-blur-sm shadow-xl relative z-[100]">
+                {/* Control Center (Floating 3D) */}
+                <div className="bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl relative z-[100]">
                     <div className="flex flex-col md:flex-row gap-8 items-end justify-center">
                         <div className="w-full md:w-80 relative z-[110]">
-                            <label className="block text-sm font-medium text-muted-foreground mb-2">Select Market Ticker</label>
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-2">Audit Target Stock</label>
                             <StockSelector
                                 onSelect={fetchAnalysisData}
                                 watchlist={watchlist}
                                 toggleWatchlist={toggleWatchlist}
-                                modelType="linear"
-                                setModelType={() => {}}
+                                modelType={modelType}
+                                setModelType={setModelType}
                             />
                         </div>
 
-                        {result && (
+                        {resultData && (
                             <button
                                 onClick={handleDownloadCSV}
-                                className="w-full md:w-auto px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                                className="w-full md:w-auto px-8 py-3.5 bg-emerald-500/10 hover:bg-emerald-500 border border-emerald-500/30 text-emerald-400 hover:text-white font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95 group"
                             >
-                                <Download className="w-5 h-5" /> Export Report
+                                <div className="p-1 px-2.5 bg-emerald-500/20 rounded-md group-hover:bg-white/20">
+                                    <Download className="w-4 h-4" />
+                                </div>
+                                Export Audit Report
                             </button>
                         )}
                     </div>
                 </div>
 
-                {result && !loading && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                        {/* Avg Accuracy Card */}
-                        <div className="bg-card/40 p-6 rounded-2xl border border-border shadow-lg backdrop-blur-md flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Average Accuracy</p>
-                                <h3 className="text-3xl font-black text-primary mt-1">
-                                    {(result.filter(r => r.accuracy).reduce((acc, curr) => acc + curr.accuracy, 0) / result.filter(r => r.accuracy).length).toFixed(2)}%
-                                </h3>
+                {resultData && !loading && (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10"
+                    >
+                        <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-slate-800 shadow-xl backdrop-blur-xl flex flex-col justify-between relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-20 transition-opacity">
+                                <Target className="w-20 h-20" />
                             </div>
-                            <div className="p-3 bg-primary/10 rounded-xl text-primary"><Target className="w-8 h-8" /></div>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Baseline Accuracy</p>
+                            <h3 className="text-5xl font-black text-primary tracking-tighter">
+                                {(resultData.filter(r => r.accuracy).reduce((acc, curr) => acc + curr.accuracy, 0) / resultData.filter(r => r.accuracy).length).toFixed(1)}%
+                            </h3>
                         </div>
 
-                        {/* Current Price Card */}
-                        <div className="bg-card/40 p-6 rounded-2xl border border-border shadow-lg backdrop-blur-md flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Last Recorded (₹)</p>
-                                <h3 className="text-3xl font-black text-foreground mt-1">
-                                    ₹{result[result.length - 1].actual_close.toLocaleString()}
-                                </h3>
+                        <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-slate-800 shadow-xl backdrop-blur-xl flex flex-col justify-between relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-20 transition-opacity">
+                                <Cpu className="w-20 h-20 text-emerald-500" />
                             </div>
-                            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500"><TrendingUp className="w-8 h-8" /></div>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Session Delta</p>
+                            <h3 className={`text-5xl font-black tracking-tighter ${resultData[resultData.length - 1].daily_change_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {resultData[resultData.length - 1].daily_change_pct}%
+                            </h3>
                         </div>
 
-                        {/* Recent Diff Card */}
-                        <div className="bg-card/40 p-6 rounded-2xl border border-border shadow-lg backdrop-blur-md flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Latest Error (₹)</p>
-                                <h3 className="text-3xl font-black text-foreground mt-1">
-                                    ₹{Math.abs(result[result.length - 1].actual_close - (result[result.length - 1].predicted_close || result[result.length - 1].actual_close)).toFixed(2)}
-                                </h3>
+                        <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-slate-800 shadow-xl backdrop-blur-xl flex flex-col justify-between relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-20 transition-opacity">
+                                <Database className="w-20 h-20 text-slate-500" />
                             </div>
-                            <div className="p-3 bg-slate-500/10 rounded-xl text-slate-500"><CheckCircle className="w-8 h-8" /></div>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Neural Error Margin</p>
+                            <h3 className="text-5xl font-black text-white tracking-tighter">
+                                {formatPrice(Math.abs(resultData[resultData.length - 1].prediction_error || 0).toFixed(1))}
+                            </h3>
                         </div>
-                    </div>
+                    </motion.div>
                 )}
 
-                <div className="relative z-10">
+                {/* Audit Grid (3D Table View) */}
+                <div className="relative z-10 transition-transform duration-500">
                     {loading && (
-                        <div className="space-y-4">
-                            {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} className="h-20 bg-card/20 rounded-xl animate-pulse border border-border/50"></div>
+                        <div className="space-y-6">
+                            {[1, 2, 3, 4].map(i => (
+                                <div key={i} className="h-28 bg-slate-900/20 rounded-3xl animate-pulse border border-slate-800" />
                             ))}
                         </div>
                     )}
 
                     {error && (
-                        <div className="p-6 bg-destructive/10 text-destructive rounded-xl border border-destructive/20 text-center flex flex-col items-center gap-2">
-                            <AlertCircle className="w-10 h-10" />
-                            <p className="font-medium">{error}</p>
+                        <div className="p-12 bg-rose-500/10 text-rose-500 rounded-[3rem] border border-rose-500/20 text-center flex flex-col items-center gap-4 font-bold backdrop-blur-xl">
+                            <AlertCircle className="w-12 h-12" />
+                            <p className="text-xl">{error}</p>
                         </div>
                     )}
 
-                    {result && !loading && (
+                    {resultData && !loading && (
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-card/40 rounded-3xl border border-border overflow-hidden shadow-2xl backdrop-blur-md"
+                            style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+                            initial={{ opacity: 0, z: -100 }}
+                            animate={{ opacity: 1, z: 0 }}
+                            className="bg-slate-900/40 rounded-[3rem] border border-slate-800 overflow-hidden shadow-2xl backdrop-blur-3xl"
                         >
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className="bg-secondary/50 border-b border-border">
-                                            <th className="px-6 py-6 text-sm font-semibold text-muted-foreground uppercase tracking-wider">Historical Date</th>
-                                            <th className="px-6 py-6 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-right">Actual Close (₹)</th>
-                                            <th className="px-6 py-6 text-sm font-semibold text-primary uppercase tracking-wider text-right bg-primary/5">AI Prediction (₹)</th>
-                                            <th className="px-6 py-6 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-center">Daily Close Move</th>
-                                            <th className="px-6 py-6 text-sm font-semibold text-muted-foreground uppercase tracking-wider text-right">Accuracy Score</th>
+                                        <tr className="bg-slate-800/30 border-b border-slate-800 shadow-md">
+                                            <th className="px-8 py-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Historical Node</th>
+                                            <th className="px-8 py-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">Open State</th>
+                                            <th className="px-8 py-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">Close Reality</th>
+                                            <th className="px-8 py-8 text-[10px] font-black text-primary uppercase tracking-[0.2em] text-right bg-primary/5">Neural Inference</th>
+                                            <th className="px-8 py-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-center">Audit Status</th>
+                                            <th className="px-8 py-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">Score</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {result.map((row, idx) => (
-                                            <tr key={idx} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
-                                                <td className="px-6 py-5 font-mono text-muted-foreground flex items-center gap-2">
-                                                    <Briefcase className="w-4 h-4 opacity-30" /> {row.date}
+                                    <tbody className="divide-y divide-slate-800/50">
+                                        {resultData.map((row, idx) => (
+                                            <motion.tr 
+                                                key={idx} 
+                                                whileHover={{ z: 30, backgroundColor: "rgba(30, 41, 59, 0.4)" }}
+                                                className="transition-all duration-300 group cursor-default"
+                                            >
+                                                <td className="px-8 py-8 font-mono text-slate-400 text-xs flex items-center gap-3 whitespace-nowrap">
+                                                    <Briefcase className="w-4 h-4 text-primary opacity-40" /> {row.date}
                                                 </td>
-                                                <td className="px-6 py-5 text-right font-bold text-foreground">₹{row.actual_close.toLocaleString()}</td>
-                                                <td className="px-6 py-5 text-right font-black text-primary bg-primary/5 text-lg">
-                                                    {row.predicted_close ? `₹${row.predicted_close.toLocaleString()}` : <span className="opacity-20 text-xs">- Training Baseline -</span>}
+                                                <td className="px-8 py-8 text-right font-bold text-slate-500 text-sm italic">{formatPrice(row.actual_open)}</td>
+                                                <td className="px-8 py-8 text-right font-black text-white text-base">{formatPrice(row.actual_close)}</td>
+                                                <td className="px-8 py-8 text-right font-black text-primary bg-primary/5 text-lg shadow-inner">
+                                                    {row.predicted_close ? formatPrice(row.predicted_close) : <span className="opacity-20 text-[10px] tracking-widest">TRAINING...</span>}
                                                 </td>
-                                                <td className="px-6 py-5 text-center">
-                                                    {row.daily_change_pct ? (
-                                                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black shadow-sm ${
-                                                            row.daily_change_pct >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
-                                                        }`}>
-                                                            {row.daily_change_pct >= 0 ? '▲' : '▼'} {Math.abs(row.daily_change_pct)}%
-                                                        </span>
-                                                    ) : <Minus className="mx-auto opacity-20" />}
+                                                <td className="px-8 py-8">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        {row.daily_change_pct ? (
+                                                            <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg ${
+                                                                row.daily_change_pct >= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                                            }`}>
+                                                                {row.daily_change_pct >= 0 ? 'BULL' : 'BEAR'} : {row.daily_change_pct >= 0 ? '+' : ''}{row.daily_change_pct}%
+                                                            </span>
+                                                        ) : null}
+                                                        
+                                                        {row.prediction_error !== null && (
+                                                            <span className={`text-[10px] font-black px-3 py-1 rounded-lg border tracking-tighter ${
+                                                                Math.abs(row.prediction_error) < 5 ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/5' : 'border-slate-800 text-slate-500 bg-slate-900/50'
+                                                            }`}>
+                                                                {row.prediction_error >= 0 ? '+' : ''}{row.prediction_error.toFixed(1)} Δ
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
-                                                <td className="px-6 py-5 text-right">
+                                                <td className="px-8 py-8 text-right">
                                                     {row.accuracy ? (
-                                                        <div className="flex flex-col items-end">
-                                                            <div className="flex items-center gap-1.5 font-bold text-lg">
-                                                                <CheckCircle className={`w-4 h-4 ${row.accuracy >= 98 ? 'text-emerald-500' : row.accuracy >= 95 ? 'text-yellow-500' : 'text-slate-500'}`} />
+                                                        <div className="flex flex-col items-end gap-2">
+                                                            <div className="flex items-center gap-2 font-black text-xl tracking-tighter">
+                                                                <CheckCircle className={`w-4 h-4 ${row.accuracy >= 98 ? 'text-emerald-500' : row.accuracy >= 95 ? 'text-yellow-400' : 'text-slate-600'}`} />
                                                                 {row.accuracy}%
                                                             </div>
-                                                            <div className="w-24 h-1.5 bg-secondary/50 rounded-full mt-1 overflow-hidden">
+                                                            <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden shadow-inner">
                                                                 <motion.div 
-                                                                    className={`h-full rounded-full ${row.accuracy >= 95 ? 'bg-primary' : 'bg-slate-500'}`}
+                                                                    className={`h-full rounded-full ${row.accuracy >= 95 ? 'bg-primary shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'bg-slate-700'}`}
                                                                     initial={{ width: 0 }}
                                                                     animate={{ width: `${row.accuracy}%` }}
                                                                 />
                                                             </div>
                                                         </div>
-                                                    ) : <span className="text-muted-foreground/30 text-xs italic">N/A (N-1)</span>}
+                                                    ) : <span className="text-slate-700 text-[10px] font-black italic tracking-widest uppercase">Baselining...</span>}
                                                 </td>
-                                            </tr>
+                                            </motion.tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
                             
-                            <div className="p-6 bg-secondary/10 flex items-center justify-between text-xs text-muted-foreground">
-                                <span className="flex items-center gap-2"><Briefcase className="w-4 h-4" /> Calculated via Linear Regression Engine</span>
-                                <span className="italic">* Accuracy Score = 100 - (Absolute Error Percentage)</span>
+                            <div className="p-8 bg-slate-800/30 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest border-t border-slate-800">
+                                <span className="flex items-center gap-3"><Database className="w-4 h-4 opacity-40" /> Neural Lens Engine v3.04.1</span>
+                                <span className="italic">* Accuracy Audit Threshold &gt; 95%</span>
                             </div>
                         </motion.div>
                     )}
 
-                    {!result && !loading && !error && (
-                        <div className="text-center py-24 opacity-30 select-none">
-                            <TrendingUp className="w-24 h-24 mx-auto mb-6" />
-                            <p className="text-2xl font-bold uppercase tracking-widest text-muted-foreground">Select a Stock to Benchmarking AI</p>
+                    {!resultData && !loading && !error && (
+                        <div className="text-center py-32 opacity-10 select-none">
+                            <Cpu className="w-32 h-32 mx-auto mb-10 animate-pulse text-white" />
+                            <p className="text-3xl font-black uppercase tracking-[0.4em] text-white">Initialize Audit Lens</p>
                         </div>
                     )}
                 </div>

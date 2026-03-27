@@ -12,6 +12,8 @@ import NewsPage from './pages/NewsPage';
 import BacktestPage from './pages/BacktestPage';
 import HeatmapPage from './pages/HeatmapPage';
 import PriceAnalysisPage from './pages/PriceAnalysisPage';
+import DocsPage from './pages/DocsPage';
+import TermsPage from './pages/TermsPage';
 
 function AppContent() {
   const location = useLocation();
@@ -30,6 +32,8 @@ function AppContent() {
             <Route path="/analysis" element={<PriceAnalysisPage />} />
             <Route path="/features" element={<FeaturesPage />} />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/docs" element={<DocsPage />} />
+            <Route path="/terms" element={<TermsPage />} />
           </Routes>
         </AnimatePresence>
       </div>

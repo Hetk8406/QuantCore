@@ -1,32 +1,44 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
-import { Search, ChevronDown, Check, Star } from "lucide-react";
+import { Search, ChevronDown, Check, Star, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils"; // Assuming utils exists for cn helper
+import { cn } from "@/lib/utils"; 
 
 const StockSelector = ({ onSelect, modelType, setModelType, watchlist = [], toggleWatchlist }) => {
-    const [stocks, setStocks] = useState([]);
     const [query, setQuery] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const containerRef = useRef(null);
 
+    // Debounced Search Logic
     useEffect(() => {
-        const fetchStocks = async () => {
+        if (!query || query.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+
+        const fetchResults = async () => {
+            setLoading(true);
             try {
-                const res = await axios.get("http://127.0.0.1:8000/api/stocks");
-                setStocks(res.data);
+                const res = await axios.get(`http://127.0.0.1:8000/api/search?q=${query}`);
+                setSearchResults(res.data);
+                setIsOpen(true);
             } catch (err) {
-                console.error("Failed to fetch stocks", err);
+                console.error("Global search failed", err);
             } finally {
                 setLoading(false);
             }
         };
-        fetchStocks();
 
-        // Close on outside click
-        const handleClickOutside = (event) => {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
+        const timeoutId = setTimeout(fetchResults, 400); // 400ms debounce
+        return () => clearTimeout(timeoutId);
+    }, [query]);
+
+    // Handle outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
                 setIsOpen(false);
             }
         };
@@ -34,60 +46,37 @@ const StockSelector = ({ onSelect, modelType, setModelType, watchlist = [], togg
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const filteredStocks = stocks.filter((stock) =>
-        stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
-        stock.name.toLowerCase().includes(query.toLowerCase())
-    );
-
-    // Group stocks: Starred first
-    const starredStocks = filteredStocks.filter(stock => watchlist.includes(stock.symbol));
-    const otherStocks = filteredStocks.filter(stock => !watchlist.includes(stock.symbol));
-
-    // Combine for display (Starred first, then others)
-    const displayStocks = [...starredStocks, ...otherStocks];
-
-    // Generate consistent color from string
-    const stringToColor = (str) => {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
-        return "#" + "00000".substring(0, 6 - c.length) + c;
-    };
-
-    // Generate HSL color that is always legible
+    // Color Generation for Avatar
     const getAvatarColor = (str) => {
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
             hash = str.charCodeAt(i) + ((hash << 5) - hash);
         }
-        const hue = hash % 360;
-        return `hsl(${hue}, 70%, 50%)`;
+        return `hsl(${hash % 360}, 70%, 50%)`;
     };
 
     return (
         <div className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto z-[50] relative" ref={containerRef}>
 
-            {/* 1. Model Selection Pills */}
-            <div className="flex bg-secondary/50 p-1.5 rounded-full border border-border backdrop-blur-sm">
+            {/* AI Model Selection */}
+            <div className="flex bg-slate-900/50 p-1.5 rounded-full border border-slate-800 backdrop-blur-xl">
                 <button
                     className={cn(
-                        "px-6 py-2 rounded-full text-sm font-semibold transition-all duration-300",
+                        "px-6 py-2 rounded-full text-sm font-black transition-all uppercase tracking-widest",
                         modelType === 'linear'
-                            ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                            ? "bg-slate-800 text-white shadow-xl ring-1 ring-slate-700"
+                            : "text-slate-500 hover:text-white"
                     )}
                     onClick={() => setModelType('linear')}
                 >
-                    Standard (Linear)
+                    Nueron Standard
                 </button>
                 <button
                     className={cn(
-                        "px-6 py-2 rounded-full text-sm font-semibold transition-all duration-300 relative overflow-hidden",
+                        "px-8 py-2 rounded-full text-sm font-black transition-all uppercase tracking-[0.2em] relative overflow-hidden",
                         modelType === 'lstm'
-                            ? "text-primary-foreground shadow-md"
-                            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                            ? "text-primary-foreground"
+                            : "text-slate-500 hover:text-white"
                     )}
                     onClick={() => setModelType('lstm')}
                 >
@@ -99,132 +88,112 @@ const StockSelector = ({ onSelect, modelType, setModelType, watchlist = [], togg
                         />
                     )}
                     <span className="relative z-10 flex items-center gap-2">
-                        Advanced (AI)
-                        {modelType === 'lstm' && <span className="flex h-2 w-2 rounded-full bg-green-400 animate-pulse" />}
+                         Advanced AI Core
+                        {modelType === 'lstm' && <span className="flex h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />}
                     </span>
                 </button>
             </div>
 
-            {/* 2. Search Box */}
+            {/* GLOBAL SYMBOL SEARCH BAR */}
             <div className="relative w-full group">
                 <motion.div
                     className={cn(
-                        "flex items-center bg-card/80 backdrop-blur-md border border-border rounded-xl px-4 py-3 shadow-sm transition-all duration-300",
-                        isOpen ? "ring-2 ring-primary/20 border-primary shadow-lg scale-[1.02]" : "hover:border-primary/50"
+                        "flex items-center bg-slate-900/80 backdrop-blur-3xl border border-slate-800 rounded-[2rem] px-6 py-4 transition-all duration-300",
+                        isOpen ? "ring-2 ring-primary/40 border-primary scale-[1.02] shadow-[0_0_40px_rgba(59,130,246,0.2)]" : "hover:border-primary/30"
                     )}
-                    initial={false}
                 >
-                    <Search className={cn("w-5 h-5 mr-3 transition-colors", isOpen ? "text-primary" : "text-muted-foreground")} />
+                    <Search className={cn("w-5 h-5 mr-3 transition-colors", isOpen ? "text-primary" : "text-slate-500")} />
                     <input
                         type="text"
-                        placeholder="Search specific stock..."
-                        className="bg-transparent border-none outline-none w-full text-lg font-medium placeholder:text-muted-foreground/50 text-foreground"
+                        placeholder="Search global stocks (e.g. RELIANCE, AAPL, TSLA)..."
+                        className="bg-transparent border-none outline-none w-full text-lg font-bold placeholder:text-slate-600 text-white"
                         value={query}
-                        onChange={(e) => {
-                            setQuery(e.target.value);
-                            setIsOpen(true);
-                        }}
+                        onChange={(e) => setQuery(e.target.value)}
                         onFocus={() => setIsOpen(true)}
                     />
-                    <div className="flex items-center gap-2">
-                        {loading && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
-                        <ChevronDown
-                            className={`w-5 h-5 text-muted-foreground transition-transform duration-300 ${isOpen ? "rotate-180 text-primary" : ""}`}
-                            onClick={() => setIsOpen(!isOpen)}
-                        />
+                    <div className="flex items-center gap-3">
+                        {loading && <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin mr-2" />}
+                        <div className="w-px h-6 bg-slate-800" />
+                        <ChevronDown className={cn("w-5 h-5 text-slate-500 transition-transform duration-300", isOpen ? "rotate-180 text-primary" : "")} />
                     </div>
                 </motion.div>
 
-                {/* 3. Dropdown Menu */}
+                {/* SEARCH RESULTS OVERLAY */}
                 <AnimatePresence>
                     {isOpen && (
                         <motion.div
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="absolute top-full left-0 right-0 mt-3 p-2 bg-card/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent z-[9999]"
+                            className="absolute top-full left-0 right-0 mt-4 p-3 bg-slate-900/95 backdrop-blur-3xl border border-slate-800 rounded-[2.5rem] shadow-2xl z-[9999] max-h-[450px] overflow-hidden flex flex-col"
                         >
-                            {loading ? (
-                                <div className="p-8 text-center text-muted-foreground text-sm">Loading market data...</div>
-                            ) : displayStocks.length > 0 ? (
-                                <div className="flex flex-col gap-1">
-                                    {/* Optional: Section Header for Starred */}
-                                    {starredStocks.length > 0 && query === "" && (
-                                        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                            Favorites
-                                        </div>
-                                    )}
-
-                                    {displayStocks.map((stock) => {
-                                        const isStarred = watchlist.includes(stock.symbol);
-                                        const avatarColor = getAvatarColor(stock.symbol);
-
-                                        return (
-                                            <motion.div
-                                                key={stock.symbol}
-                                                initial={{ opacity: 0, x: -10 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                className="p-3 rounded-lg hover:bg-secondary/80 cursor-pointer flex justify-between items-center group transition-colors relative overflow-hidden"
-                                                onClick={() => {
-                                                    onSelect(stock.symbol);
-                                                    setQuery(stock.symbol); // Set name on click
-                                                    setIsOpen(false);
-                                                }}
-                                            >
-                                                <div className="flex items-center gap-4 z-10">
-                                                    {/* Avatar */}
-                                                    <div
-                                                        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm"
-                                                        style={{ backgroundColor: avatarColor }}
-                                                    >
-                                                        {stock.symbol[0]}
-                                                    </div>
-
-                                                    <div className="flex flex-col">
-                                                        <span className="font-bold text-foreground group-hover:text-primary transition-colors">
-                                                            {stock.symbol}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            National Stock Exchange
-                                                        </span>
+                            <div className="overflow-y-auto scrollbar-hide flex flex-col gap-2 p-2">
+                                {/* Favorites Section */}
+                                {!query && watchlist.length > 0 && (
+                                     <div className="px-5 py-3 text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] flex items-center gap-2">
+                                         <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" /> My Watchlist
+                                     </div>
+                                )}
+                                
+                                {searchResults.length > 0 ? (
+                                    searchResults.map((stock) => (
+                                        <motion.div
+                                            key={stock.symbol}
+                                            whileHover={{ scale: 1.01, x: 5 }}
+                                            className="p-4 rounded-3xl hover:bg-slate-800/80 cursor-pointer flex justify-between items-center group transition-all border border-transparent hover:border-primary/20"
+                                            onClick={() => {
+                                                onSelect(stock.symbol);
+                                                setQuery(stock.symbol);
+                                                setIsOpen(false);
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div 
+                                                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-2xl relative overflow-hidden"
+                                                    style={{ backgroundColor: getAvatarColor(stock.symbol) }}
+                                                >
+                                                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    {stock.symbol[0]}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-white group-hover:text-primary transition-colors tracking-tight">
+                                                        {stock.symbol}
+                                                    </span>
+                                                    <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                        <Globe className="w-2.5 h-2.5" /> {stock.exchange} | {stock.name.slice(0, 25)}...
                                                     </div>
                                                 </div>
-
-                                                {toggleWatchlist && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleWatchlist(stock.symbol);
-                                                        }}
-                                                        className={`p-2 rounded-full transition-all z-10 hover:bg-background ${isStarred
-                                                            ? "text-yellow-400"
-                                                            : "text-muted-foreground/30 hover:text-yellow-400"
-                                                            }`}
-                                                    >
-                                                        <Star
-                                                            className={cn("w-5 h-5 transition-transform active:scale-90", isStarred ? "fill-yellow-400" : "")}
-                                                        />
-                                                    </button>
-                                                )}
-
-                                                {/* Selection Checkmark (if currently typed) */}
-                                                {query === stock.symbol && (
-                                                    <div className="absolute right-14 top-1/2 -translate-y-1/2 text-primary opacity-20">
-                                                        <Check className="w-16 h-16" />
-                                                    </div>
-                                                )}
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="p-8 text-center flex flex-col items-center gap-2 text-muted-foreground">
-                                    <Search className="w-8 h-8 opacity-20" />
-                                    <p>No results found for "{query}"</p>
-                                </div>
-                            )}
+                                            </div>
+                                            
+                                            {toggleWatchlist && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleWatchlist(stock.symbol);
+                                                    }}
+                                                    className={cn(
+                                                        "p-3 rounded-2xl transition-all hover:bg-slate-700 shadow-inner",
+                                                        watchlist.includes(stock.symbol) ? "text-yellow-400" : "text-slate-600"
+                                                    )}
+                                                >
+                                                    <Star className={cn("w-5 h-5", watchlist.includes(stock.symbol) ? "fill-yellow-400" : "")} />
+                                                </button>
+                                            )}
+                                        </motion.div>
+                                    ))
+                                ) : query && !loading ? (
+                                    <div className="py-20 text-center flex flex-col items-center gap-4">
+                                        <div className="p-6 bg-slate-800 rounded-full animate-pulse">
+                                             <Search className="w-10 h-10 text-slate-600" />
+                                        </div>
+                                        <p className="text-slate-500 text-xs font-black uppercase tracking-widest">No Intelligence for "{query}"</p>
+                                    </div>
+                                ) : !query && (
+                                    <div className="py-20 text-center flex flex-col items-center gap-4 opacity-50">
+                                         <p className="text-slate-500 text-xs font-black uppercase tracking-widest leading-relaxed">Type 2+ characters to scan<br/>the global markets.</p>
+                                    </div>
+                                )}
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>

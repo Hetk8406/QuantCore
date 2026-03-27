@@ -1,3 +1,5 @@
+import requests
+import xml.etree.ElementTree as ET
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import yfinance as yf
 
@@ -5,7 +7,7 @@ analyzer = SentimentIntensityAnalyzer()
 
 def get_stock_sentiment(symbol):
     """
-    Fetches news for a stock and calculates sentiment score.
+    Fetches news from Google News RSS and calculates sentiment score.
     Returns:
         dict: {
             "score": float (-1 to 1),
@@ -14,42 +16,70 @@ def get_stock_sentiment(symbol):
         }
     """
     try:
-        # 1. Fetch News
-        stock = yf.Ticker(symbol)
-        news = stock.news
+        # 1. RSS Feed Strategy (Google News)
+        clean_symbol = symbol.replace(".NS", "").replace(".BO", "")
         
-        if not news:
+        # Intelligent Search Query
+        is_indian = ".NS" in symbol or ".BO" in symbol
+        query_suffix = "+stock+news+india" if is_indian else "+stock+news"
+        url = f"https://news.google.com/rss/search?q={clean_symbol}{query_suffix}&hl=en-IN&gl=IN&ceid=IN:en"
+        
+        response = requests.get(url, timeout=10)
+        root = ET.fromstring(response.content)
+        
+        sentiment_news = []
+        total_score = 0
+        
+        # Scrape top 10 articles
+        for item in root.findall('.//item')[:10]:
+            title_text = item.find('title').text
+            # Remove the source suffix (e.g. " - The Economic Times")
+            title = title_text.split(" - ")[0] if " - " in title_text else title_text
+            link = item.find('link').text
+            pub_date = item.find('pubDate').text
+            
+            # Use VADER on the title
+            vs = analyzer.polarity_scores(title)
+            score = vs['compound']
+            total_score += score
+            
+            sentiment_news.append({
+                "title": title,
+                "link": link,
+                "publisher": title_text.split(" - ")[-1] if " - " in title_text else "Google News",
+                "published": pub_date,
+                "score": score
+            })
+
+        # 2. Fallback to yfinance if RSS fails
+        if not sentiment_news:
+            stock = yf.Ticker(symbol)
+            news = stock.news
+            if news:
+                for article in news[:5]:
+                    title = article.get('title', '')
+                    if not title: continue
+                    vs = analyzer.polarity_scores(title)
+                    score = vs['compound']
+                    total_score += score
+                    sentiment_news.append({
+                        "title": title,
+                        "link": article.get('link', '#'),
+                        "publisher": article.get('publisher', 'Yahoo Finance'),
+                        "score": score
+                    })
+
+        # 3. Final Calculations
+        if not sentiment_news:
             return {
                 "score": 0,
                 "label": "Neutral",
                 "news": []
             }
 
-        # 2. Analyze Sentiment
-        total_score = 0
-        sentiment_news = []
+        avg_score = total_score / len(sentiment_news)
         
-        for article in news:
-            title = article.get('title', '')
-            if not title:
-                continue
-                
-            # Calculate VADER score for the title
-            vs = analyzer.polarity_scores(title)
-            compound = vs['compound']
-            total_score += compound
-            
-            sentiment_news.append({
-                "title": title,
-                "link": article.get('link', '#'),
-                "publisher": article.get('publisher', 'Unknown'),
-                "score": compound
-            })
-
-        # 3. Calculate Average
-        avg_score = total_score / len(sentiment_news) if sentiment_news else 0
-        
-        # 4. Determine Label
+        # Determine Label with high sensitivity
         if avg_score >= 0.05:
             label = "Bullish"
         elif avg_score <= -0.05:
@@ -60,13 +90,13 @@ def get_stock_sentiment(symbol):
         return {
             "score": round(avg_score, 2),
             "label": label,
-            "news": sentiment_news[:5] # Return top 5
+            "news": sentiment_news # Return all analyzed news
         }
 
     except Exception as e:
-        print(f"Error fetching sentiment for {symbol}: {e}")
+        print(f"Sentiment Audit Error for {symbol}: {e}")
         return {
             "score": 0,
-            "label": "Error",
+            "label": "Idle",
             "news": []
         }

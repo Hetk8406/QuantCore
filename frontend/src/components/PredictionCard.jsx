@@ -2,11 +2,17 @@ import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Target, Activity, Zap, CheckCircle2 } from "lucide-react";
 
 const PredictionCard = ({ data }) => {
-    const { symbol, current_price, current_date, predicted_price, prediction_date, mae, r2_score } = data;
+    const { symbol, current_price, current_date, predicted_price, prediction_date, mae, r2_score, currency_symbol = '₹' } = data;
 
     const diff = predicted_price - current_price;
     const percentChange = ((diff / current_price) * 100).toFixed(2);
     const isPositive = diff >= 0;
+
+    // Helper to format currency with space for long codes (e.g. KRW vs $)
+    const formatPrice = (val) => {
+        const needsSpace = currency_symbol.length > 1;
+        return `${currency_symbol}${needsSpace ? ' ' : ''}${val?.toLocaleString()}`;
+    };
 
     return (
         <motion.div
@@ -30,7 +36,7 @@ const PredictionCard = ({ data }) => {
                 {/* Current */}
                 <div className="space-y-1">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Current</p>
-                    <div className="text-2xl font-bold text-foreground">₹{current_price}</div>
+                    <div className="text-2xl font-bold text-foreground">{formatPrice(current_price)}</div>
                     <p className="text-[10px] text-muted-foreground">{current_date}</p>
                 </div>
 
@@ -45,7 +51,7 @@ const PredictionCard = ({ data }) => {
                 <div className="space-y-1 text-right">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Predicted</p>
                     <div className={`text-2xl font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                        ₹{predicted_price}
+                        {formatPrice(predicted_price)}
                     </div>
                     <p className={`text-[10px] font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                         {isPositive ? '+' : ''}{percentChange}%
@@ -83,7 +89,7 @@ const PredictionCard = ({ data }) => {
                     </div>
                     <div>
                         <p className="text-xs text-muted-foreground">Mean Error</p>
-                        <p className="text-sm font-bold">₹{mae}</p>
+                        <p className="text-sm font-bold">{formatPrice(mae)}</p>
                     </div>
                 </div>
             </div>

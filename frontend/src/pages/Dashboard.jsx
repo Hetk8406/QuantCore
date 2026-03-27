@@ -4,10 +4,11 @@ import StockSelector from '../components/StockSelector';
 import PredictionCard from '../components/PredictionCard';
 import PriceChart from '../components/PriceChart';
 import SentimentCard from '../components/SentimentCard';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 
 import DashboardSkeleton from '../components/DashboardSkeleton';
 import SignalGauge from '../components/SignalGauge';
+import { Activity, ShieldCheck, Database } from 'lucide-react';
 
 function Dashboard() {
     const [predictionData, setPredictionData] = useState(null);
@@ -16,10 +17,20 @@ function Dashboard() {
     const [error, setError] = useState(null);
     const [modelType, setModelType] = useState('linear');
 
-    const [isComparing, setIsComparing] = useState(false);
-    const [predictionData2, setPredictionData2] = useState(null);
-    const [sentimentData2, setSentimentData2] = useState(null);
-    const [loading2, setLoading2] = useState(false);
+    // 3D Motion Values
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+    const springX = useSpring(x, { stiffness: 100, damping: 30 });
+    const springY = useSpring(y, { stiffness: 100, damping: 30 });
+    const rotateX = useTransform(springY, [-0.5, 0.5], [5, -5]);
+    const rotateY = useTransform(springX, [-0.5, 0.5], [-5, 5]);
+
+    const handleMouseMove = (e) => {
+        const { clientX, clientY } = e;
+        const { innerWidth, innerHeight } = window;
+        x.set((clientX / innerWidth) - 0.5);
+        y.set((clientY / innerHeight) - 0.5);
+    };
 
     // Watchlist State
     const [watchlist, setWatchlist] = useState(() => {
@@ -70,120 +81,82 @@ function Dashboard() {
         }
     };
 
-    const handleSelectStock2 = async (symbol) => {
-        setLoading2(true);
-        setPredictionData2(null);
-        setSentimentData2(null);
-        try {
-            const predRes = await axios.get(`http://127.0.0.1:8000/api/predict/${symbol}?model_type=${modelType}`);
-            setPredictionData2(predRes.data);
-
-            try {
-                const sentRes = await axios.get(`http://127.0.0.1:8000/api/sentiment/${symbol}`);
-                setSentimentData2(sentRes.data);
-            } catch (e) {
-                console.warn("Sentiment 2 failed", e);
-            }
-
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading2(false);
-        }
-    };
-
     return (
-        <div className="min-h-screen bg-background text-foreground p-4 pt-32 md:px-8 md:pb-8 md:pt-32 font-sans selection:bg-primary/20">
-            <div className="max-w-7xl mx-auto">
+        <div 
+            onMouseMove={handleMouseMove}
+            className="min-h-screen bg-[#020617] text-foreground p-4 pt-32 md:px-8 md:pb-8 md:pt-32 font-sans selection:bg-primary/20 relative overflow-hidden"
+            style={{ perspective: "1200px" }}
+        >
+            {/* Background 3D Grid */}
+            <div className="absolute inset-0 pointer-events-none opacity-20">
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:60px_60px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+            </div>
 
-                {/* Global Controls */}
-                <div className="flex justify-center mb-8 gap-4">
-                    <button
-                        onClick={() => setIsComparing(!isComparing)}
-                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-colors ${isComparing ? 'bg-primary text-primary-foreground border-primary' : 'bg-transparent border-border hover:bg-secondary'
-                            }`}
-                    >
-                        {isComparing ? 'Exit Comparison' : 'Compare Stocks'}
-                    </button>
-                </div>
+            <div className="max-w-7xl mx-auto relative z-10">
 
-                {isComparing ? (
-                    /* ================= COMPARISON MODE LAYOUT ================= */
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* STOCK 1 */}
-                        <div className="flex flex-col gap-6">
-                            <div className="relative z-50">
-                                <StockSelector onSelect={handleSelectStock} modelType={modelType} setModelType={setModelType} watchlist={watchlist} toggleWatchlist={toggleWatchlist} />
-                            </div>
-                            {loading && <DashboardSkeleton />}
-                            {error && <ErrorMessage message={error} />}
+                <div className="flex flex-col gap-10 max-w-6xl mx-auto min-h-[600px]">
 
-                            {predictionData && !loading && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                                    <SignalGauge signal={predictionData.signal} score={predictionData.signal_score} />
-                                    <PredictionCard data={predictionData} />
-                                    <SentimentCard sentiment={sentimentData} />
-                                    <PriceChart data={predictionData.chart_data} />
-                                </motion.div>
-                            )}
-                        </div>
-
-                        {/* STOCK 2 */}
-                        <div className="flex flex-col gap-6 lg:pl-8 lg:border-l border-border/50">
-                            <div className="bg-secondary/20 p-4 rounded-xl border border-dashed border-border text-center relative z-40">
-                                <p className="text-sm text-muted-foreground mb-2">Select Comparison Target</p>
-                                <StockSelector onSelect={handleSelectStock2} modelType={modelType} setModelType={setModelType} watchlist={watchlist} toggleWatchlist={toggleWatchlist} />
-                            </div>
-                            {loading2 && <DashboardSkeleton />}
-
-                            {predictionData2 && !loading2 && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                                    <SignalGauge signal={predictionData2.signal} score={predictionData2.signal_score} />
-                                    <PredictionCard data={predictionData2} />
-                                    <SentimentCard sentiment={sentimentData2} />
-                                    <PriceChart data={predictionData2.chart_data} />
-                                </motion.div>
-                            )}
-                        </div>
-                    </div>
-                ) : (
-                    /* ================= SINGLE MODE LAYOUT ================= */
-                    <div className="flex flex-col gap-8 max-w-6xl mx-auto min-h-[600px]">
-
-                        {/* Standard Header */}
-                        <div className="relative z-50">
+                    {/* Standard Header */}
+                    <div className="relative z-[100] flex flex-col md:flex-row items-center gap-8 bg-slate-900/40 backdrop-blur-2xl p-8 rounded-[3rem] border border-slate-800 shadow-2xl">
+                        <div className="flex-grow w-full">
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 ml-2">Primary Analysis Node</p>
                             <StockSelector onSelect={handleSelectStock} modelType={modelType} setModelType={setModelType} watchlist={watchlist} toggleWatchlist={toggleWatchlist} />
                         </div>
+                        <div className="hidden md:flex flex-col items-end gap-2 pr-4 text-right">
+                            <div className="flex items-center gap-2 text-emerald-500 font-black text-[10px] uppercase tracking-widest">
+                                <ShieldCheck className="w-4 h-4" /> System Verified
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-widest">
+                                <Database className="w-4 h-4" /> Live NIFTY Data
+                            </div>
+                        </div>
+                    </div>
 
-                        {loading && <DashboardSkeleton />}
-                        {error && <ErrorMessage message={error} />}
+                    {loading && <DashboardSkeleton />}
+                    {error && <ErrorMessage message={error} />}
 
-                        {predictionData && !loading && (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {predictionData && !loading && (
+                        <motion.div 
+                            style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+                            initial={{ opacity: 0, y: 30 }} 
+                            animate={{ opacity: 1, y: 0 }} 
+                            className="space-y-10"
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div style={{ transform: "translateZ(60px)" }}>
                                     <SignalGauge signal={predictionData.signal} score={predictionData.signal_score} />
+                                </div>
+                                <div style={{ transform: "translateZ(20px)" }}>
                                     <PredictionCard data={predictionData} />
+                                </div>
+                                <div style={{ transform: "translateZ(40px)" }}>
                                     <SentimentCard sentiment={sentimentData} />
                                 </div>
-                                <div>
-                                    <PriceChart data={predictionData.chart_data} />
-                                </div>
-                            </motion.div>
-                        )}
-
-                        {/* Placeholder if nothing selected? Or just leave blank below selector */}
-                        {!predictionData && !loading && (
-                            <div className="flex flex-col items-center justify-center text-center mt-20 opacity-50 space-y-4">
-                                <div className="p-4 bg-secondary/30 rounded-full">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                                    </svg>
-                                </div>
-                                <p className="text-muted-foreground text-lg">Select a stock to view analysis</p>
                             </div>
-                        )}
-                    </div>
-                )}
+                            <div className="bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl overflow-hidden relative group">
+                                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <PriceChart data={predictionData.chart_data} currencySymbol={predictionData.currency_symbol} />
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Placeholder if nothing selected */}
+                    {!predictionData && !loading && (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 0.5 }}
+                            className="flex flex-col items-center justify-center text-center mt-20 space-y-6"
+                        >
+                            <div className="p-8 bg-slate-900/50 rounded-[2rem] border border-slate-800 shadow-inner">
+                                <Activity className="h-16 w-16 text-slate-600 animate-pulse" />
+                            </div>
+                            <div className="space-y-2">
+                                <p className="text-slate-400 text-xl font-bold tracking-tight">Terminal Ready</p>
+                                <p className="text-slate-500 text-sm">Select a Global Market ticker to initialize AI analysis</p>
+                            </div>
+                        </motion.div>
+                    )}
+                </div>
 
             </div>
         </div>
@@ -192,7 +165,7 @@ function Dashboard() {
 
 // Simple Helper Components for cleaner JSX
 const ErrorMessage = ({ message }) => (
-    <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg text-center my-4">
+    <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-center my-4 font-medium backdrop-blur-md">
         {message}
     </div>
 );

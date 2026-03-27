@@ -1,10 +1,25 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Newspaper, TrendingUp, TrendingDown, Clock, ExternalLink } from 'lucide-react';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { Newspaper, TrendingUp, TrendingDown, Clock, ExternalLink, Eye, Zap } from 'lucide-react';
 import axios from 'axios';
 
 const NewsPage = () => {
-    // Mock data for initial render, can be replaced with real API later
+    // Mouse tracking for 3D Parallax
+    const mouseX = useMotionValue(0);
+    const mouseY = useMotionValue(0);
+
+    const handleMouseMove = (e) => {
+        const { clientX, clientY } = e;
+        const { innerWidth, innerHeight } = window;
+        mouseX.set((clientX / innerWidth) - 0.5);
+        mouseY.set((clientY / innerHeight) - 0.5);
+    };
+
+    const springX = useSpring(mouseX, { stiffness: 100, damping: 30 });
+    const springY = useSpring(mouseY, { stiffness: 100, damping: 30 });
+    const rotateX = useTransform(springY, [-0.5, 0.5], [5, -5]);
+    const rotateY = useTransform(springX, [-0.5, 0.5], [-5, 5]);
+
     const [news, setNews] = useState([
         { id: 1, title: "NIFTY 50 Hits All-Time High Amid Global Rally", source: "MarketWatch", time: "2 hours ago", sentiment: "Bullish", sentimentScore: 0.8 },
         { id: 2, title: "Tech Sector Faces Headwinds as Inflation Data Looms", source: "Bloomberg", time: "4 hours ago", sentiment: "Bearish", sentimentScore: -0.4 },
@@ -23,50 +38,68 @@ const NewsPage = () => {
     ]);
 
     return (
-        <div className="min-h-screen bg-background pt-32 pb-20 px-6">
-            <div className="max-w-7xl mx-auto space-y-12">
+        <div 
+            onMouseMove={handleMouseMove}
+            className="min-h-screen bg-[#020617] text-foreground pt-36 pb-20 px-6 relative overflow-hidden"
+            style={{ perspective: "1500px" }}
+        >
+            {/* Background Atmosphere */}
+            <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-primary/5 rounded-full blur-[150px]" />
+                <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] bg-[size:40px_40px] opacity-20" />
+            </div>
+
+            <div className="max-w-7xl mx-auto space-y-16 relative z-10">
 
                 {/* Header */}
                 <header className="text-center space-y-4">
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium"
+                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.2em]"
                     >
-                        <Newspaper className="w-4 h-4" /> Market Insights
+                        <Newspaper className="w-3 h-3" /> Sentiment Intel
                     </motion.div>
-                    <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                        Global Market Pulse
+                    <h1 className="text-5xl md:text-7xl font-black tracking-tighter bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
+                        Global <span className="text-primary italic">Pulse</span>
                     </h1>
-                    <p className="text-muted-foreground max-w-2xl mx-auto">
-                        Stay ahead with curated financial news and real-time sentiment analysis powered by our AI engine.
+                    <p className="text-slate-400 max-w-2xl mx-auto font-medium">
+                        Live semantic extraction from thousands of financial nodes. 
+                        Turning headlines into quantitative market signals.
                     </p>
                 </header>
 
-                {/* Sector Performance Bar */}
-                <div className="flex flex-wrap justify-center gap-4">
+                {/* Sector Performance Bar (Layered 3D) */}
+                <div className="flex flex-wrap justify-center gap-6">
                     {sectors.map((sector, idx) => (
                         <motion.div
                             key={sector.name}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            initial={{ opacity: 0, z: -100 }}
+                            animate={{ opacity: 1, z: 0 }}
                             transition={{ delay: idx * 0.1 }}
-                            className={`px-4 py-2 rounded-xl border ${sector.trending === 'up' ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-red-500/10 border-red-500/20 text-red-500'
-                                } flex items-center gap-2 font-medium text-sm`}
+                            whileHover={{ scale: 1.1, z: 50, rotateY: 10 }}
+                            className={`px-6 py-3 rounded-2xl border backdrop-blur-xl shadow-2xl ${sector.trending === 'up' 
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                                : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                                } flex items-center gap-3 font-black text-xs tracking-tight transition-all cursor-default relative overflow-hidden`}
                         >
+                            <div className={`absolute inset-0 bg-current opacity-[0.03]`} />
                             {sector.name}
-                            <span className="font-bold">{sector.change}</span>
+                            <span className="text-white opacity-90">{sector.change}</span>
                             {sector.trending === 'up' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                         </motion.div>
                     ))}
                 </div>
 
-                {/* Main News Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Main News Display with 3D Rotation */}
+                <motion.div 
+                    style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+                >
                     {news.map((item, idx) => (
                         <NewsCard key={item.id} item={item} index={idx} />
                     ))}
-                </div>
+                </motion.div>
 
             </div>
         </div>
@@ -77,37 +110,61 @@ const NewsCard = ({ item, index }) => {
     const isBullish = item.sentiment === 'Bullish';
     const isBearish = item.sentiment === 'Bearish';
 
+    // Local 3D state for hover
+    const [hovered, setHovered] = useState(false);
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="group relative bg-card/50 backdrop-blur-sm border border-border p-6 rounded-2xl hover:bg-card/80 transition-all hover:shadow-lg hover:shadow-primary/5 cursor-pointer flex flex-col justify-between"
+            initial={{ opacity: 0, y: 50, z: -100 }}
+            animate={{ opacity: 1, y: 0, z: 0 }}
+            transition={{ delay: index * 0.1, duration: 0.6 }}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            whileHover={{ 
+                z: 100, 
+                backgroundColor: "rgba(30, 41, 59, 0.6)",
+                borderColor: "rgba(255, 255, 255, 0.2)" 
+            }}
+            className="group relative bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 p-8 rounded-[2.5rem] transition-all duration-500 shadow-2xl cursor-pointer flex flex-col justify-between overflow-hidden"
         >
-            <div>
-                <div className="flex justify-between items-start mb-4">
-                    <span className={`text-xs font-bold px-2 py-1 rounded-md ${isBullish ? 'bg-green-500/20 text-green-400' :
-                        isBearish ? 'bg-red-500/20 text-red-400' :
-                            'bg-blue-500/20 text-blue-400'
+            {/* 3D Reflection Effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            
+            <div className="relative z-10">
+                <div className="flex justify-between items-center mb-6">
+                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${isBullish 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : isBearish 
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                         }`}>
+                        {isBullish ? <Zap className="w-3 h-3 fill-emerald-400" /> : isBearish ? <Eye className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                         {item.sentiment}
-                    </span>
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {item.time}
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1.5 italic">
+                         {item.time}
                     </span>
                 </div>
 
-                <h3 className="text-lg font-bold mb-3 line-clamp-2 group-hover:text-primary transition-colors">
+                <h3 className="text-xl font-black mb-4 leading-tight group-hover:text-primary transition-colors pr-4">
                     {item.title}
                 </h3>
             </div>
 
-            <div className="flex justify-between items-center mt-4 pt-4 border-t border-border/50">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="relative z-10 flex justify-between items-center mt-6 pt-6 border-t border-slate-800/50">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                     {item.source}
                 </span>
-                <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                <div className="p-2 bg-slate-800 rounded-xl group-hover:bg-primary transition-all group-hover:scale-110">
+                    <ExternalLink className="w-4 h-4 text-white" />
+                </div>
             </div>
+
+            {/* Hidden Floating Detail Line */}
+            <motion.div 
+                animate={{ x: hovered ? 20 : -50, opacity: hovered ? 0.3 : 0 }}
+                className="absolute top-1/2 right-0 w-2 h-16 bg-primary rounded-full blur-sm"
+            />
         </motion.div>
     );
 };
