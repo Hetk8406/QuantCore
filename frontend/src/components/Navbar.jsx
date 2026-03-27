@@ -11,6 +11,7 @@ const Navbar = () => {
         { name: 'Dashboard', path: '/dashboard' },
         { name: 'News', path: '/news' },
         { name: 'Heatmap', path: '/heatmap' },
+        { name: 'Analysis', path: '/analysis' },
         { name: 'Backtest AI', path: '/backtest' },
         { name: 'Features', path: '/features' },
         { name: 'About', path: '/about' },

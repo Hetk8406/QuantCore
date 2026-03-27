@@ -11,6 +11,7 @@ import Footer from './components/Footer';
 import NewsPage from './pages/NewsPage';
 import BacktestPage from './pages/BacktestPage';
 import HeatmapPage from './pages/HeatmapPage';
+import PriceAnalysisPage from './pages/PriceAnalysisPage';
 
 function AppContent() {
   const location = useLocation();
@@ -26,6 +27,7 @@ function AppContent() {
             <Route path="/news" element={<NewsPage />} />
             <Route path="/backtest" element={<BacktestPage />} />
             <Route path="/heatmap" element={<HeatmapPage />} />
+            <Route path="/analysis" element={<PriceAnalysisPage />} />
             <Route path="/features" element={<FeaturesPage />} />
             <Route path="/about" element={<AboutPage />} />
           </Routes>

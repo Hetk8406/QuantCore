@@ -46,10 +46,10 @@ const Footer = () => {
                 <div>
                     <h3 className="font-bold mb-4">Connect</h3>
                     <div className="flex gap-4">
-                        <SocialLink href="#" icon={<Twitter className="w-5 h-5" />} />
-                        <SocialLink href="#" icon={<Linkedin className="w-5 h-5" />} />
-                        <SocialLink href="#" icon={<Github className="w-5 h-5" />} />
-                        <SocialLink href="#" icon={<Mail className="w-5 h-5" />} />
+                        <SocialLink href="https://x.com/KikaniHet" icon={<Twitter className="w-5 h-5" />} />
+                        <SocialLink href="https://www.linkedin.com/in/het-kikani-67817236b/" icon={<Linkedin className="w-5 h-5" />} />
+                        <SocialLink href="https://github.com/Hetk8406" icon={<Github className="w-5 h-5" />} />
+                        <SocialLink href="mailto:[hetkikani990@gmail.com]" icon={<Mail className="w-5 h-5" />} />
                     </div>
                 </div>
             </div>

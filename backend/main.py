@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from stocks import get_all_stocks
-from model import train_predict, fetch_data, run_backtest, get_market_heatmap
+from model import train_predict, fetch_data, run_backtest, get_market_heatmap, generate_stock_report, get_price_analysis_data
+from fastapi.responses import FileResponse
+import os
 from sentiment import get_stock_sentiment
 
 app = FastAPI()
@@ -64,3 +66,13 @@ def heatmap():
     Returns the daily % change for NIFTY 50 stocks for heatmap visualization.
     """
     return get_market_heatmap()
+
+@app.get("/api/analysis/{symbol}")
+def price_analysis(symbol: str):
+    """
+    Returns a tabular analysis showing historical price data.
+    """
+    result = get_price_analysis_data(symbol)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result

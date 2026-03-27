@@ -428,6 +428,43 @@ def run_backtest(symbol, days=30):
         "data": aligned_results
     }
 
+def generate_stock_report(symbol):
+    df = fetch_data(symbol, period="1y")
+    if df is None or len(df) < 60:
+        return None
+    
+    # Train a quick model for the predicted price
+    df['MA10'] = df['Close'].rolling(window=10).mean()
+    df['MA50'] = df['Close'].rolling(window=50).mean()
+    df_clean = df.copy().dropna()
+    
+    features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50']
+    X = df_clean[features]
+    y = df_clean['Close'].shift(-1).fillna(df_clean['Close'] * 1.01) # Simple target for latest row
+    
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    # Analyze the last 30 days
+    report_df = df.tail(30).copy()
+    report_df['Next_Day_Prediction'] = model.predict(report_df[features])
+    report_df['Prev_Close'] = report_df['Close'].shift(1)
+    report_df['Daily_Change_Pct'] = ((report_df['Close'] - report_df['Prev_Close']) / report_df['Prev_Close']) * 100
+    
+    # Formatting
+    report_df['Date'] = report_df.index.strftime('%Y-%m-%d')
+    output_cols = ['Date', 'Prev_Close', 'Close', 'Daily_Change_Pct', 'Next_Day_Prediction']
+    final_report = report_df[output_cols].copy()
+    
+    import os
+    report_dir = "reports"
+    if not os.path.exists(report_dir):
+        os.makedirs(report_dir)
+        
+    file_path = f"{report_dir}/{symbol}_analysis.xlsx"
+    final_report.to_excel(file_path, index=False)
+    return file_path
+
 def get_market_heatmap():
     from stocks import NIFTY_50
     import yfinance as yf
@@ -463,4 +500,74 @@ def get_market_heatmap():
             
     # Sort by descending order of percentage change
     results.sort(key=lambda x: x["change"], reverse=True)
+    return results
+
+def get_price_analysis_data(symbol):
+    """
+    Fetches historical data and runs a mini-backtest to show predictions vs actuals 
+    for the analysis period.
+    """
+    df = fetch_data(symbol, period="6mo") # Fetch 6 months to ensure MA50 is populated
+    if df is None or len(df) < 20:
+        return {"error": "Insufficient data (need at least 20 trading days)"}
+    
+    # Feature Engineering
+    df['MA10'] = df['Close'].rolling(window=10).mean()
+    df['MA50'] = df['Close'].rolling(window=50).mean()
+    df = df.dropna()
+    df = df.reset_index()
+    
+    # Split for mini-backtest of the last 10 days
+    backtest_days = 10
+    split_idx = len(df) - backtest_days
+    train_df = df.iloc[:split_idx].copy()
+    test_df = df.iloc[split_idx:].copy()
+    
+    # Train a standard linear model on everything BEFORE the analysis period
+    features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50']
+    train_df['Target'] = train_df['Close'].shift(-1)
+    train_df = train_df.dropna()
+    
+    X_train = train_df[features]
+    y_train = train_df['Target']
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    
+    # Predict for each day in the analysis period
+    # On day T, we use features from day T to predict close of day T+1
+    # So for row i, predicted = Model.predict(test_df[i])
+    X_test = test_df[features]
+    preds = model.predict(X_test)
+    
+    # Since we predicted Next Day Closes, we need to compare them with the ACTUAL next day
+    # Or shift: The prediction made ON Day T-1 for Day T
+    
+    results = []
+    
+    # To align correctly:
+    # Day T (today) actual: test_df.iloc[idx]['Close']
+    # Day T (today) prediction (made yesterday): preds[idx-1]
+    
+    for i in range(len(test_df)):
+        date_str = test_df.iloc[i]['Date'].strftime('%Y-%m-%d')
+        actual = float(test_df.iloc[i]['Close'])
+        
+        # Get what we predicted yesterday FOR today (if applicable)
+        predicted = None
+        accuracy_val = None
+        
+        if i > 0:
+             predicted = float(preds[i-1]) # Prediction for Day i made on Day i-1
+             error = abs(predicted - actual)
+             accuracy_val = max(0, 100 - (error / actual * 100))
+             
+        results.append({
+            "date": date_str,
+            "actual_close": round(actual, 2),
+            "predicted_close": round(predicted, 2) if predicted else None,
+            "accuracy": round(accuracy_val, 2) if accuracy_val else None,
+            "prev_close": round(float(test_df.iloc[i-1]['Close']), 2) if i > 0 else None,
+            "daily_change_pct": round(float(((test_df.iloc[i]['Close'] - test_df.iloc[i-1]['Close']) / test_df.iloc[i-1]['Close']) * 100), 2) if i > 0 else None
+        })
+        
     return results
