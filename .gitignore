@@ -4,6 +4,8 @@ backend/__pycache__/
 backend/models/*.keras
 backend/models/*.pkl
 frontend/dist/
+frontend/dev-dist/
 frontend/node_modules/
 .env
 .DS_Store
+scratch/

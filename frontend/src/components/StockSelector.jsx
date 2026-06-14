@@ -21,7 +21,7 @@ const StockSelector = ({ onSelect, modelType, setModelType, watchlist = [], togg
         const fetchResults = async () => {
             setLoading(true);
             try {
-                const res = await axios.get(`http://127.0.0.1:8000/api/search?q=${query}`);
+                const res = await axios.get(`/api/search?q=${query}`);
                 setSearchResults(res.data);
                 setIsOpen(true);
             } catch (err) {

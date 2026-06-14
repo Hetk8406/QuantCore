@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { ArrowRight, Activity, Cpu, ShieldCheck, Globe, Zap } from 'lucide-react';
 
+import StockMarquee from '../components/StockMarquee';
+
 const LandingPage = () => {
     const canvasRef = useRef(null);
     const mouseX = useMotionValue(0.5);
@@ -125,7 +127,11 @@ const LandingPage = () => {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#020617_90%)] z-[1]" />
 
             {/* CONTENT LAYER */}
-            <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col items-center justify-center pt-48 pb-20 px-6">
+            <div className="relative z-[20] w-full pt-32">
+                <StockMarquee />
+            </div>
+
+            <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col items-center justify-center pt-24 pb-20 px-6">
                 
                 <motion.div 
                     initial={{ opacity: 0, y: 50 }}

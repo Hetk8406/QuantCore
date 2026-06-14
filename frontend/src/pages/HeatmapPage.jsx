@@ -31,7 +31,7 @@ const HeatmapPage = () => {
     useEffect(() => {
         const fetchHeatmap = async () => {
             try {
-                const response = await axios.get('http://127.0.0.1:8000/api/heatmap');
+                const response = await axios.get('/api/heatmap');
                 setStocks(response.data);
             } catch (err) {
                 console.error("Heatmap fetch error:", err);

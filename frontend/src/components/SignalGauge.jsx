@@ -1,8 +1,13 @@
 import { motion } from 'framer-motion';
 
-const SignalGauge = ({ signal, score }) => {
+const SignalGauge = ({ signal, score, symbol }) => {
+    const isGold = symbol === 'GC=F';
+    const isSilver = symbol === 'SI=F';
+
     // Determine color based on score (0-100)
     const getColor = (s) => {
+        if (isGold) return "text-yellow-500";
+        if (isSilver) return "text-slate-300";
         if (s >= 80) return "text-emerald-500";
         if (s >= 60) return "text-green-500";
         if (s >= 40) return "text-yellow-500";
@@ -11,6 +16,8 @@ const SignalGauge = ({ signal, score }) => {
     };
 
     const getBgColor = (s) => {
+        if (isGold) return "bg-yellow-500";
+        if (isSilver) return "bg-slate-400";
         if (s >= 80) return "bg-emerald-500";
         if (s >= 60) return "bg-green-500";
         if (s >= 40) return "bg-yellow-500";

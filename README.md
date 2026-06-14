@@ -12,6 +12,10 @@ An advanced, AI-powered web application for predicting Indian stock prices (NIFT
   - **LSTM Neural Network**: Deep learning for complex time-series forecasting.
 - **Model Persistence**: Automatically saves trained models for instant subsequent load times.
 
+### 📱 Progressive Web App (PWA)
+- **Standalone Mobile Installation**: Install the application directly onto your Android/iOS home screen with customized high-res icons.
+- **Offline & Manifest Capabilities**: Uses `vite-plugin-pwa` to register service workers and set up manifest configs for native-like app styling.
+
 ### 🧠 Sentiment Analysis
 - **Real-Time News**: Fetches latest financial headlines for specific stocks.
 - **Smart Scoring**: Uses VADER NLP to assign Bullish/Bearish scores to news.
@@ -22,11 +26,12 @@ An advanced, AI-powered web application for predicting Indian stock prices (NIFT
 - **Technical Indicators**: Toggle RSI (Relative Strength Index) and MACD overlays.
 - **Comparison Mode**: Split-screen view to compare two stocks side-by-side.
 - **Watchlist**: Save your favorite stocks for quick access (persisted locally).
+- **Stock Marquee Ticker**: Real-time infinite-scrolling ticker bar tracking top indices and active stock updates at a glance.
 
-### 🌐 Modern Architecture
+### 🌐 Modern Architecture & Mobile Access
 - **Multi-Page Layout**: Landing, Dashboard, News, Features, and About pages.
-- **Responsive Design**: Fully optimized for Desktop, Tablet, and Mobile.
-- **Premium UI**: Glassmorphism effects, skeleton loaders, and smooth frame-motion animations.
+- **Local Network Sharing**: Fully configured to bind to `0.0.0.0` (backend) and `--host` (frontend) allowing direct cross-device testing.
+- **Premium UI**: Glassmorphism effects, skeleton loaders, and smooth framer-motion animations.
 
 ---
 
@@ -63,6 +68,11 @@ We have streamlined the startup process. You only need to run **one command** in
    npm start
    ```
 3. The app will open automatically in your browser at `http://localhost:5173`.
+4. **Mobile / Local Network Testing**:
+   - Make sure your mobile device is on the same Wi-Fi network as your computer.
+   - Find your computer's local IP address (e.g. `192.168.1.15`).
+   - Open `http://<YOUR_LOCAL_IP>:5173` on your smartphone's browser.
+   - Tap **"Add to Home Screen"** or the Install prompt to install the application as a standalone PWA!
 
 ### Manual Setup (Legacy)
 If you prefer to run servers separately:

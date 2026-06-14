@@ -13,9 +13,18 @@ const PriceAnalysisPage = () => {
     const [error, setError] = useState(null);
 
     // Helper to format currency with space for long codes (e.g. KRW vs $)
+    // Enforces 2 decimal places for audit precision
     const formatPrice = (val) => {
+        if (val === null || val === undefined) return 'N/A';
+        const num = typeof val === 'number' ? val : parseFloat(val);
         const needsSpace = currencySymbol.length > 1;
-        return `${currencySymbol}${needsSpace ? ' ' : ''}${val?.toLocaleString()}`;
+        
+        const formattedNum = num.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+
+        return `${currencySymbol}${needsSpace ? ' ' : ''}${formattedNum}`;
     };
 
     // Mouse Tracking for 3D Perspective Audit
@@ -62,7 +71,7 @@ const PriceAnalysisPage = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/api/analysis/${symbol}?model_type=${modelType}`);
+            const res = await axios.get(`/api/analysis/${symbol}?model_type=${modelType}`);
             // res.data is now { data: [], currency_symbol: "" }
             setResultData(res.data.data);
             setCurrencySymbol(res.data.currency_symbol || '₹');

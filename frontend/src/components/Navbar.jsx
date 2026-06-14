@@ -18,8 +18,8 @@ const Navbar = () => {
 
     const navLinks = [
         { name: 'Terminal', path: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-        { name: 'MarketPulse', path: '/news', icon: <Newspaper className="w-4 h-4" /> },
-        { name: 'Cityscape', path: '/heatmap', icon: <Box className="w-4 h-4" /> },
+        { name: 'Pulse', path: '/news', icon: <Newspaper className="w-4 h-4" /> },
+        { name: 'Heatmap', path: '/heatmap', icon: <Box className="w-4 h-4" /> },
         { name: 'Analysis', path: '/analysis', icon: <Activity className="w-4 h-4" /> },
         { name: 'Backtest', path: '/backtest', icon: <History className="w-4 h-4" /> },
     ];
@@ -42,7 +42,7 @@ const Navbar = () => {
                     <div className="p-2 rounded-xl bg-primary/20 border border-primary/30 group-hover:bg-primary/30 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)]">
                         <TrendingUp className="w-6 h-6 text-primary" />
                     </div>
-                    <span className="font-black text-xl md:text-2xl tracking-tighter text-white">Stock<span className="text-primary italic">AI</span></span>
+                    <span className="font-black text-xl md:text-2xl tracking-tighter text-white">Quant<span className="text-primary italic">Core</span></span>
                 </NavLink>
 
                 {/* Desktop Menu */}
@@ -78,7 +78,7 @@ const Navbar = () => {
                         to="/dashboard"
                         className="px-6 py-2.5 bg-primary text-slate-950 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-[0_0_30px_rgba(59,130,246,0.3)] hover:scale-105 hover:shadow-primary/50 active:scale-95 transition-all"
                     >
-                        Live Terminal
+                        Terminal Access
                     </NavLink>
                 </div>
 
@@ -122,7 +122,7 @@ const Navbar = () => {
                                 onClick={() => setIsOpen(false)}
                                 className="mt-4 px-6 py-5 bg-primary text-slate-950 text-center font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl"
                             >
-                                Launch Live Terminal
+                                Open Terminal
                             </NavLink>
                         </div>
                     </motion.div>

@@ -44,7 +44,7 @@ const AboutPage = () => {
 
                 <div className="pt-8 border-t border-border">
                     <p className="text-sm text-muted-foreground">
-                        Developed by <strong className="text-foreground">Het Kikani</strong>
+                        Developed by <strong className="text-foreground">Hettik Patel</strong>
                     </p>
                 </div>
 

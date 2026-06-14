@@ -9,13 +9,8 @@ from sentiment import get_stock_sentiment
 
 app = FastAPI()
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5176",
-]
+origins = ["*"]
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,12 +43,13 @@ def search_stocks(q: str):
         # Format for frontend StockSelector
         formatted = []
         for qt in quotes:
-            # We filter for EQUITY and ETF types
-            if qt.get('quoteType') in ['EQUITY', 'ETF']:
+            # We filter for EQUITY, ETF, and FUTURE (Commodities)
+            if qt.get('quoteType') in ['EQUITY', 'ETF', 'FUTURE']:
                 formatted.append({
                     "symbol": qt.get('symbol'),
                     "name": qt.get('shortname', qt.get('longname', 'Unknown')),
-                    "exchange": qt.get('exchange', 'GLOBAL')
+                    "exchange": qt.get('exchange', 'COMMODITY' if qt.get('quoteType') == 'FUTURE' else 'GLOBAL'),
+                    "type": qt.get('quoteType')
                 })
         return formatted[:8] # Limit to top 8 for clean UI
     except Exception as e:
@@ -104,3 +100,72 @@ def price_analysis(symbol: str, model_type: str = "linear"):
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+@app.get("/api/top-stocks")
+def get_top_stocks():
+    """
+    Returns a curated list of top Indian & World stocks/commodities 
+    for the homepage marquee.
+    """
+    import yfinance as yf
+    ticker_list = [
+        "^NSEI", "^BSESN", "RELIANCE.NS", "TCS.NS", # India
+        "^IXIC", "AAPL", "MSFT", "NVDA", "TSLA", # World
+        "GC=F", "BTC-USD" # Commodities/Crypto
+    ]
+    
+    results = []
+    for sym in ticker_list:
+        try:
+            t = yf.Ticker(sym)
+            # Reliable price fetching strategy
+            info = t.info
+            price = info.get('regularMarketPrice', info.get('currentPrice', 0))
+            
+            # If currentPrice/regularMarketPrice is 0 (sometimes happens with yf), use fast_info or history
+            if not price:
+                fast = t.fast_info
+                price = fast.get('last_price', 0)
+            if not price:
+                hist = t.history(period='1d')
+                if not hist.empty:
+                    price = hist['Close'].iloc[-1]
+            
+            price = round(float(price), 2) if price else 0
+            
+            # Daily change calculation
+            prev = info.get('previousClose')
+            if not prev:
+                prev = t.fast_info.get('previous_close', price)
+            
+            change = round(((price - prev) / prev) * 100, 2) if prev and price else 0
+            
+            # Label mapping
+            labels = {
+                "^NSEI": "Nifty 50",
+                "^BSESN": "SENSEX",
+                "RELIANCE.NS": "Reliance",
+                "TCS.NS": "TCS",
+                "^IXIC": "NASDAQ",
+                "AAPL": "Apple",
+                "MSFT": "Microsoft",
+                "NVDA": "NVIDIA",
+                "TSLA": "Tesla",
+                "GC=F": "Gold",
+                "BTC-USD": "Bitcoin"
+            }
+            
+            # Use established currency meta logic
+            from model import get_currency_meta
+            curr_meta = get_currency_meta(sym)
+            
+            results.append({
+                "symbol": labels.get(sym, sym),
+                "price": price,
+                "change": change,
+                "currency_symbol": curr_meta["symbol"]
+            })
+        except Exception:
+            continue
+            
+    return results

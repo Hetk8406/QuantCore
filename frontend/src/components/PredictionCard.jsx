@@ -7,6 +7,8 @@ const PredictionCard = ({ data }) => {
     const diff = predicted_price - current_price;
     const percentChange = ((diff / current_price) * 100).toFixed(2);
     const isPositive = diff >= 0;
+    const isGold = symbol === 'GC=F';
+    const isSilver = symbol === 'SI=F';
 
     // Helper to format currency with space for long codes (e.g. KRW vs $)
     const formatPrice = (val) => {
@@ -14,19 +16,27 @@ const PredictionCard = ({ data }) => {
         return `${currency_symbol}${needsSpace ? ' ' : ''}${val?.toLocaleString()}`;
     };
 
+    const cardStyles = isGold 
+        ? "bg-yellow-500/5 backdrop-blur-md border border-yellow-500/20 rounded-xl p-6 shadow-[0_0_20px_rgba(234,179,8,0.05)] flex flex-col justify-between h-full"
+        : isSilver
+        ? "bg-slate-400/5 backdrop-blur-md border border-slate-400/20 rounded-xl p-6 shadow-sm flex flex-col justify-between h-full"
+        : "bg-card/50 backdrop-blur-md border border-border rounded-xl p-6 shadow-sm flex flex-col justify-between h-full";
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-card/50 backdrop-blur-md border border-border rounded-xl p-6 shadow-sm flex flex-col justify-between h-full"
+            className={cardStyles}
         >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-foreground/90 flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-yellow-500" />
-                    AI Forecast
+                    <Zap className={`w-5 h-5 ${isGold ? 'text-yellow-400' : isSilver ? 'text-slate-300' : 'text-primary'}`} />
+                    <span className={isGold ? 'text-yellow-500' : isSilver ? 'text-slate-200' : ''}>
+                        {isGold ? 'Gold Vault' : isSilver ? 'Silver Reserve' : 'AI Forecast'}
+                    </span>
                 </h2>
-                <span className="text-xs font-mono px-2 py-1 rounded bg-secondary text-muted-foreground border border-border">
+                <span className={`text-xs font-mono px-2 py-1 rounded border ${isGold ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' : 'bg-secondary text-muted-foreground border-border'}`}>
                     {symbol}
                 </span>
             </div>

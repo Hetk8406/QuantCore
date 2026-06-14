@@ -60,7 +60,8 @@ def fetch_data(symbol: str, period="5y"):
     """Fetches historical data from Yahoo Finance."""
     try:
         ticker = yf.Ticker(symbol)
-        df = ticker.history(period=period)
+        # Use auto_adjust=False to get raw Open/Close prices exactly as they were on the exchange
+        df = ticker.history(period=period, auto_adjust=False)
         if df.empty:
             return None
         return df
@@ -558,9 +559,27 @@ def get_price_analysis_data(symbol, model_type="linear"):
     if df is None or len(df) < 20:
         return {"error": "Insufficient data (need at least 20 trading days)"}
     
-    # Feature Engineering
+    # Feature Engineering for higher precision
     df['MA10'] = df['Close'].rolling(window=10).mean()
     df['MA50'] = df['Close'].rolling(window=50).mean()
+    
+    # NEW: Momentum Indicators (helps the model stay 'near' the actual price)
+    df['EMA12'] = df['Close'].ewm(span=12, adjust=False).mean()
+    
+    # RSI Calculation
+    delta = df['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / (loss + 1e-9)
+    df['RSI'] = 100 - (100 / (1 + rs))
+    
+    # NEW: Volatility Bands (Bollinger Bands)
+    # This teaches the AI the difference between a 'normal' move and an 'extreme' breakout
+    df['BB_Mid'] = df['Close'].rolling(window=20).mean()
+    df['BB_Std'] = df['Close'].rolling(window=20).std()
+    df['BB_Upper'] = df['BB_Mid'] + (df['BB_Std'] * 2)
+    df['BB_Lower'] = df['BB_Mid'] - (df['BB_Std'] * 2)
+    
     df = df.dropna()
     df = df.reset_index()
     
@@ -570,26 +589,48 @@ def get_price_analysis_data(symbol, model_type="linear"):
     train_df = df.iloc[:split_idx].copy()
     test_df = df.iloc[split_idx:].copy()
     
-    # Train a model on everything BEFORE the analysis period
-    features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50']
-    train_df['Target'] = train_df['Close'].shift(-1)
-    train_df = train_df.dropna()
+    # EXPERIMENTAL: Added Bollinger Bands to the features
+    # If the margin gets worse, I have backed up the previous state: 
+    # features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50', 'EMA12', 'RSI']
+    features = ['Open', 'High', 'Low', 'Close', 'Volume', 'MA10', 'MA50', 'EMA12', 'RSI', 'BB_Upper', 'BB_Lower']
+    
+    # NEW: Hyper-Aggressive Recency Weighting Logic
+    n_train = len(train_df)
+    weights = np.linspace(0.1, 1.0, n_train)
+    weights = weights ** 3 # Cubic weight for maximum 'near-near' tightness
     
     X_train = train_df[features]
-    y_train = train_df['Target']
+    X_test = test_df[features]
     
     if model_type == 'lstm':
-        # For analysis, we use RandomForest as 'Advanced' because it's faster than LSTM 
-        # but capture more patterns than Linear
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-    else:
-        model = LinearRegression()
+        # ADVANCED AI CORE: Velocity Engine
+        # Instead of predicting absolute price (which hits an invisible ceiling), 
+        # we train the AI to predict 'Price Velocity' (how many rupees it will move tomorrow).
+        train_df['Delta_Target'] = train_df['Close'].shift(-1) - train_df['Close']
+        train_df = train_df.dropna()
         
-    model.fit(X_train, y_train)
-    
-    # Predict for each day in the analysis period
-    X_test = test_df[features]
-    preds = model.predict(X_test)
+        y_train_delta = train_df['Delta_Target']
+        # Align X_train with the dropped NA row
+        X_train_delta = train_df[features]
+        
+        from sklearn.ensemble import GradientBoostingRegressor
+        model = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
+        model.fit(X_train_delta, y_train_delta, sample_weight=weights[:-1]) # Drop last weight to match
+        
+        delta_preds = model.predict(X_test)
+        # Reconstruct absolute price: Current Close + Predicted Delta
+        preds = test_df['Close'].values + delta_preds
+    else:
+        # NEURON STANDARD: Weighted Linear Trend
+        train_df['Target'] = train_df['Close'].shift(-1)
+        train_df = train_df.dropna()
+        
+        y_train = train_df['Target']
+        X_train_lin = train_df[features]
+        
+        model = LinearRegression()
+        model.fit(X_train_lin, y_train, sample_weight=weights[:-1])
+        preds = model.predict(X_test)
     
     # Since we predicted Next Day Closes, we need to compare them with the ACTUAL next day
     # Or shift: The prediction made ON Day T-1 for Day T
@@ -624,8 +665,31 @@ def get_price_analysis_data(symbol, model_type="linear"):
             "daily_change_pct": round(float(((test_df.iloc[i]['Close'] - test_df.iloc[i-1]['Close']) / test_df.iloc[i-1]['Close']) * 100), 2) if i > 0 else None
         })
         
-    # Get Currency Meta
+    # Get Currency Meta and Live Snapshot for the current day
     meta = get_currency_meta(symbol)
+    
+    # Patch the last row with Live Snapshot data if it's for "Today"
+    # This prevents the 1460 vs 1463.1 discrepancy for the current session
+    try:
+        ticker = yf.Ticker(symbol)
+        fast = ticker.fast_info
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        
+        if results and results[-1]["date"] == today_str:
+            live_open = fast.get('open')
+            live_last = fast.get('last_price')
+            
+            if live_open:
+                results[-1]["actual_open"] = round(float(live_open), 2)
+            if live_last:
+                results[-1]["actual_close"] = round(float(live_last), 2)
+                
+            # Re-calculate accuracy if we have a prediction
+            if results[-1]["predicted_close"]:
+                error = abs(results[-1]["predicted_close"] - results[-1]["actual_close"])
+                results[-1]["accuracy"] = round(max(0, 100 - (error / results[-1]["actual_close"] * 100)), 2)
+    except Exception:
+        pass # Fallback to history if fast_info fails
         
     return {
         "data": results,

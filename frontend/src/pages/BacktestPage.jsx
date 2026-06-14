@@ -60,7 +60,7 @@ const BacktestPage = () => {
         setError(null);
 
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/api/backtest/${currentSymbol}?days=${days}&model_type=${modelType}`);
+            const res = await axios.get(`/api/backtest/${currentSymbol}?days=${days}&model_type=${modelType}`);
             setResult(res.data);
         } catch (err) {
             console.error(err);

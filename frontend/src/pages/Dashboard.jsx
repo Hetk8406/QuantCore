@@ -63,11 +63,11 @@ function Dashboard() {
         setSentimentData(null);
 
         try {
-            const predRes = await axios.get(`http://127.0.0.1:8000/api/predict/${symbol}?model_type=${modelType}`);
+            const predRes = await axios.get(`/api/predict/${symbol}?model_type=${modelType}`);
             setPredictionData(predRes.data);
 
             try {
-                const sentRes = await axios.get(`http://127.0.0.1:8000/api/sentiment/${symbol}`);
+                const sentRes = await axios.get(`/api/sentiment/${symbol}`);
                 setSentimentData(sentRes.data);
             } catch (sentErr) {
                 console.warn("Sentiment fetch failed (optional feature):", sentErr);
@@ -124,7 +124,11 @@ function Dashboard() {
                         >
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 <div style={{ transform: "translateZ(60px)" }}>
-                                    <SignalGauge signal={predictionData.signal} score={predictionData.signal_score} />
+                                    <SignalGauge 
+                                        signal={predictionData.signal} 
+                                        score={predictionData.signal_score} 
+                                        symbol={predictionData.symbol}
+                                    />
                                 </div>
                                 <div style={{ transform: "translateZ(20px)" }}>
                                     <PredictionCard data={predictionData} />

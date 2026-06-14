@@ -15,11 +15,11 @@ const Footer = () => {
                         <div className="p-2 rounded-xl bg-primary/20 border border-primary/30 group-hover:bg-primary/30 transition-all shadow-[0_0_20px_rgba(59,130,246,0.1)]">
                             <TrendingUp className="w-6 h-6 text-primary" />
                         </div>
-                        <span className="font-black text-2xl tracking-tighter text-white">Stock<span className="text-primary italic">AI</span></span>
+                        <span className="font-black text-2xl tracking-tighter text-white">Quant<span className="text-primary italic">Core</span></span>
                     </Link>
                     <p className="text-slate-400 text-sm leading-relaxed font-medium">
-                        Empowering retail traders with institutional-grade neural models for NIFTY 50 price sequences. 
-                        Make data-driven decisions with high-frequency accuracy.
+                        Advanced Global Asset Intelligence powered by neural predictive models. 
+                        Tracking stocks, precious metals, and market sentiment across international exchanges with institutional-grade precision.
                     </p>
                     <div className="pt-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
                         <ShieldCheck className="w-3 h-3" /> Encrypted Analysis Node
@@ -54,7 +54,7 @@ const Footer = () => {
                         </Link></li>
                         <li>
                             <a 
-                                href="http://127.0.0.1:8000/docs" 
+                                href={`http://${window.location.hostname}:8000/docs`} 
                                 target="_blank" 
                                 rel="noreferrer"
                                 className="hover:text-primary transition-all flex items-center gap-2 group text-emerald-400/80"
@@ -89,7 +89,7 @@ const Footer = () => {
 
             {/* Bottom Bar */}
             <div className="max-w-7xl mx-auto px-6 pt-10 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                <p>&copy; {new Date().getFullYear()} STOCK AI QUANT VISION. ALL RIGHTS RESERVED.</p>
+                <p>&copy; {new Date().getFullYear()} QUANTCORE GLOBAL VISION. ALL RIGHTS RESERVED.</p>
                 <div className="flex gap-10">
                     <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> ENGINE ONLINE</span>
                     <span className="text-slate-600">YAHOO FINANCE DATA DRAIN</span>

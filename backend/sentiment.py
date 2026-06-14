@@ -21,8 +21,16 @@ def get_stock_sentiment(symbol):
         
         # Intelligent Search Query
         is_indian = ".NS" in symbol or ".BO" in symbol
-        query_suffix = "+stock+news+india" if is_indian else "+stock+news"
-        url = f"https://news.google.com/rss/search?q={clean_symbol}{query_suffix}&hl=en-IN&gl=IN&ceid=IN:en"
+        is_commodity = "=F" in symbol
+        
+        if is_commodity:
+            commodity_map = {"GC=F": "gold", "SI=F": "silver", "PL=F": "platinum", "CL=F": "crude+oil"}
+            c_name = commodity_map.get(symbol, clean_symbol)
+            query_suffix = f"+{c_name}+prices+news"
+            url = f"https://news.google.com/rss/search?q={query_suffix}&hl=en-US&gl=US&ceid=US:en"
+        else:
+            query_suffix = "+stock+news+india" if is_indian else "+stock+news"
+            url = f"https://news.google.com/rss/search?q={clean_symbol}{query_suffix}&hl=en-IN&gl=IN&ceid=IN:en"
         
         response = requests.get(url, timeout=10)
         root = ET.fromstring(response.content)
