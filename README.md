@@ -1,12 +1,14 @@
-# Indian Stock Market Predictor 📈
+# Indian & International Stock Market Predictor 📈
 
-An advanced, AI-powered web application for predicting Indian stock prices (NIFTY 50). This full-stack application combines machine learning models with real-time sentiment analysis to provide comprehensive market insights.
+An advanced, AI-powered web application for predicting Indian (NIFTY 50) and international stock prices (such as Apple, Google, Microsoft, NVIDIA, and Tesla). This full-stack application combines machine learning models with real-time sentiment analysis and a global market search engine to provide comprehensive investment insights.
 
 ![Project Banner](frontend/src/assets/Indian%20Stock%20Market%20Predictor%20-%20LOGO.png)
 
 ## 🚀 Key Features
 
-### 🤖 AI-Powered Predictions
+### 🤖 AI-Powered Predictions & Global Reach
+- **Global Stock Coverage**: Seamless support for both Indian NSE/BSE tickers and major international equities (e.g. US stock markets), commodities (Gold), and cryptocurrencies (Bitcoin).
+- **Dynamic Search Engine**: Instant searching across world exchanges via `yahooquery` integration to analyze any global financial asset.
 - **Dual Model System**:
   - **Linear Regression**: Fast, trend-based predictions.
   - **LSTM Neural Network**: Deep learning for complex time-series forecasting.
