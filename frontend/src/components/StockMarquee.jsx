@@ -19,7 +19,7 @@ const StockMarquee = () => {
     useEffect(() => {
         const fetchTopStocks = async () => {
             try {
-                const res = await axios.get('http://127.0.0.1:8000/api/top-stocks');
+                const res = await axios.get('/api/top-stocks');
                 if (res.data && res.data.length > 0) {
                     setStocks(res.data);
                 }

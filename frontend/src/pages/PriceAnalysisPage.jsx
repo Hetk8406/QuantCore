@@ -1,8 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import axios from 'axios';
 import StockSelector from '../components/StockSelector';
 import { Download, TrendingUp, AlertCircle, Target, Briefcase, Minus, CheckCircle, ArrowRightLeft, ShieldCheck, Database, Cpu } from 'lucide-react';
+
+const INITIAL_STOCKS_POOL = [
+    { symbol: '^NSEI', name: 'Nifty 50', price: 24200.50, change: 0.32, currency_symbol: '₹' },
+    { symbol: 'RELIANCE.NS', name: 'Reliance', price: 3120.45, change: -0.15, currency_symbol: '₹' },
+    { symbol: 'AAPL', name: 'Apple', price: 215.30, change: 1.45, currency_symbol: '$' },
+    { symbol: 'MSFT', name: 'Microsoft', price: 442.10, change: 0.85, currency_symbol: '$' },
+    { symbol: 'BTC-USD', name: 'Bitcoin', price: 68420.00, change: -1.25, currency_symbol: '$' },
+    { symbol: 'TSLA', name: 'Tesla', price: 185.20, change: -2.40, currency_symbol: '$' },
+    { symbol: 'NVDA', name: 'NVIDIA', price: 125.40, change: 3.12, currency_symbol: '$' },
+    { symbol: 'TCS.NS', name: 'TCS', price: 3950.00, change: 0.50, currency_symbol: '₹' }
+];
 
 const PriceAnalysisPage = () => {
     const [selectedStock, setSelectedStock] = useState(null);
@@ -11,6 +22,49 @@ const PriceAnalysisPage = () => {
     const [resultData, setResultData] = useState(null); // The array of data
     const [currencySymbol, setCurrencySymbol] = useState('₹');
     const [error, setError] = useState(null);
+
+    const [defaultStocks, setDefaultStocks] = useState(() => {
+        // Pick 5 random items from the initial pool on mount
+        const shuffled = [...INITIAL_STOCKS_POOL].sort(() => 0.5 - Math.random());
+        return shuffled.slice(0, 5);
+    });
+    const [stockLoading, setStockLoading] = useState(true);
+    const isFirstFetch = useRef(true);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchDefaultStocks = async () => {
+            try {
+                const res = await axios.get('/api/top-stocks');
+                if (res.data && res.data.length > 0 && isMounted) {
+                    if (isFirstFetch.current) {
+                        isFirstFetch.current = false;
+                        const shuffled = [...res.data].sort(() => 0.5 - Math.random());
+                        setDefaultStocks(shuffled.slice(0, 5));
+                    } else {
+                        setDefaultStocks(prevStocks => 
+                            prevStocks.map(stock => {
+                                const match = res.data.find(s => s.symbol === stock.symbol);
+                                return match || stock;
+                            })
+                        );
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch default stocks", err);
+            } finally {
+                if (isMounted) setStockLoading(false);
+            }
+        };
+
+        fetchDefaultStocks();
+        const interval = setInterval(fetchDefaultStocks, 30000); // refresh every 30 seconds
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
+    }, []);
+
 
     // Helper to format currency with space for long codes (e.g. KRW vs $)
     // Enforces 2 decimal places for audit precision
@@ -304,11 +358,68 @@ const PriceAnalysisPage = () => {
                         </motion.div>
                     )}
 
+                    {/* Placeholder and Default Stocks if nothing selected */}
                     {!resultData && !loading && !error && (
-                        <div className="text-center py-32 opacity-10 select-none">
-                            <Cpu className="w-32 h-32 mx-auto mb-10 animate-pulse text-white" />
-                            <p className="text-3xl font-black uppercase tracking-[0.4em] text-white">Initialize Audit Lens</p>
-                        </div>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="flex flex-col items-center justify-center mt-10 space-y-8 w-full"
+                        >
+                            <div className="text-center space-y-3">
+                                <h2 className="text-2xl md:text-3xl font-black tracking-tight text-white uppercase">
+                                    Initialize Audit Lens
+                                </h2>
+                                <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
+                                    Select a Global Market ticker above to cross-reference historical data, or click one of the popular default assets below to run the audit instantly:
+                                </p>
+                            </div>
+
+                            {/* Default Stocks Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 w-full mt-6">
+                                {defaultStocks.map((stock, idx) => (
+                                    <motion.button
+                                        key={stock.symbol}
+                                        onClick={() => fetchAnalysisData(stock.symbol)}
+                                        whileHover={{ y: -6, scale: 1.03 }}
+                                        whileTap={{ scale: 0.97 }}
+                                        initial={{ opacity: 0, y: 15 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: idx * 0.08, type: "spring", stiffness: 120 }}
+                                        className="p-6 rounded-[2rem] bg-slate-900/40 border border-slate-800/80 hover:border-primary/50 text-left transition-all hover:bg-slate-900/60 shadow-[0_15px_30px_rgba(0,0,0,0.3)] group relative overflow-hidden flex flex-col justify-between min-h-[140px]"
+                                    >
+                                        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        
+                                        <div className="flex flex-col z-10">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-primary transition-colors">
+                                                {stock.name}
+                                            </span>
+                                            <span className="text-xs text-slate-400 font-bold mt-0.5">
+                                                {stock.symbol}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex flex-col mt-4 z-10">
+                                            {stockLoading ? (
+                                                <div className="h-6 w-16 bg-slate-800 animate-pulse rounded" />
+                                            ) : (
+                                                <div className="flex items-baseline justify-between w-full">
+                                                    <span className="text-lg font-black text-white tracking-tight">
+                                                        <span className="text-xs text-slate-500 mr-0.5 align-middle">{stock.currency_symbol}</span>
+                                                        {stock.price ? stock.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                                                    </span>
+                                                    <span className={`text-xs font-black ml-2 ${
+                                                        stock.change >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                                    }`}>
+                                                        {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.button>
+                                ))}
+                            </div>
+                        </motion.div>
                     )}
                 </div>
 
