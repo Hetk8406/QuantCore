@@ -33,9 +33,27 @@ An advanced, AI-powered web application for predicting Indian (NIFTY 50) and int
 ### 🌐 Modern Architecture & Mobile Access
 - **Multi-Page Layout**: Landing, Dashboard, News, Features, and About pages.
 - **Local Network Sharing**: Fully configured to bind to `0.0.0.0` (backend) and `--host` (frontend) allowing direct cross-device testing.
-- **Premium UI**: Glassmorphism effects, skeleton loaders, and smooth framer-motion animations.
 
 ---
+
+## 📸 Application Screenshots
+
+Here are screenshots of the **QuantCore** stock predictor application in action:
+
+| Screen 1 | Screen 2 |
+| :---: | :---: |
+| ![Screen 1](QuantCore/1.png) | ![Screen 2](QuantCore/2.jpg) |
+
+| Screen 3 | Screen 4 |
+| :---: | :---: |
+| ![Screen 3](QuantCore/3.jpg) | ![Screen 4](QuantCore/4.jpg) |
+
+| Screen 5 | Screen 6 |
+| :---: | :---: |
+| ![Screen 5](QuantCore/5.jpg) | ![Screen 6](QuantCore/6.jpg) |
+
+---
+
 
 ## 🛠️ Tech Stack
 
