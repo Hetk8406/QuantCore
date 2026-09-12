@@ -1,4 +1,4 @@
-# Indian & International Stock Market Predictor 📈
+# QuantCore - Indian & International Stock Market Predictor 📈
 
 An advanced, AI-powered web application for predicting Indian (NIFTY 50) and international stock prices (such as Apple, Google, Microsoft, NVIDIA, and Tesla). This full-stack application combines machine learning models with real-time sentiment analysis and a global market search engine to provide comprehensive investment insights.
 
